@@ -6,8 +6,24 @@
 // window.OttoApp is the TV app's bridge (tvapp/, ConnectActivity).
 const shownAt = Date.now();
 const app = window.OttoApp;
-const buttons = Array.from(document.querySelectorAll('[data-action]'));
+const $ = (id) => document.getElementById(id);
 
+// The page is drawn at 1920x1080: fit it to the screen.
+function fit() {
+  const k = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+  document.documentElement.style.setProperty('--k', String(k));
+}
+fit();
+window.addEventListener('resize', fit);
+
+function tick() {
+  const now = new Date();
+  $('clock').textContent = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+}
+tick();
+setInterval(tick, 5000);
+
+const buttons = Array.from(document.querySelectorAll('[data-action]'));
 buttons.forEach((b) => {
   if (!app || typeof app[b.dataset.action] !== 'function') {
     b.hidden = true; // opened in a plain browser: nothing to call
@@ -18,7 +34,7 @@ buttons.forEach((b) => {
 
 // The TV's WebView doesn't move focus with arrow keys on its own.
 document.addEventListener('keydown', (e) => {
-  const visible = buttons.filter((b) => !b.hidden);
+  const visible = buttons.filter((b) => !b.hidden && !b.closest('[hidden]'));
   if (!visible.length) return;
   const i = visible.indexOf(document.activeElement);
   if (['ArrowDown', 'ArrowRight'].includes(e.key)) {
@@ -33,21 +49,42 @@ document.addEventListener('keydown', (e) => {
 const first = document.querySelector('[data-focus]');
 if (first && !first.hidden) first.focus();
 
+function showStatus(s) {
+  const audio = $('audio');
+  if (s.audio) {
+    audio.hidden = false;
+    $('audio-label').textContent = s.audio === 'tv' ? audio.dataset.tv : audio.dataset.notebook;
+  } else {
+    audio.hidden = true;
+  }
+  $('phone').classList.toggle('dim', !(s.phones > 0));
+  $('phone-label').hidden = !(s.phones > 0);
+}
+
+function showPIN(pin) {
+  const box = $('pin');
+  if (!box || !pin || box.getAttribute('aria-label') === pin) return;
+  box.setAttribute('aria-label', pin);
+  box.querySelectorAll('.digit').forEach((d, i) => { d.textContent = pin[i] || ''; });
+}
+
 async function poll() {
   try {
     const res = await fetch('/tv/status', { cache: 'no-store' });
     const s = await res.json();
-    if (!document.getElementById('qr') && s.url) {
-      location.reload(); // just got online: show the QR code
+    if (!$('qr') && s.url) {
+      // Just got online: on to the QR code, step 2 of 2 if this was step 1.
+      location.replace($('step') ? '/tv?setup=1' : '/tv');
       return;
     }
-    const pin = document.getElementById('pin');
-    if (pin && s.pin) pin.textContent = s.pin;
-    const url = document.getElementById('url');
-    if (url && s.url) url.textContent = s.url;
+    showStatus(s);
+    showPIN(s.pin);
+    if ($('url') && s.url) $('url').textContent = 'http://' + s.url;
     if (s.pairedAt > shownAt) {
-      document.getElementById('connect').hidden = true;
-      document.getElementById('done').hidden = false;
+      $('connect').hidden = true;
+      $('hint').hidden = true;
+      if ($('step')) $('step').hidden = true;
+      $('done').hidden = false;
       if (app && app.close) setTimeout(() => app.close(), 4000);
       return;
     }

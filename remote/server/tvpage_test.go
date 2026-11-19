@@ -32,4 +32,32 @@ func TestRealTVPage(t *testing.T) {
 			t.Errorf("online page lacks %q", want)
 		}
 	}
+
+	if strings.Contains(online, "Step 2 of 2") {
+		t.Error("online page shows a setup step it wasn't asked for")
+	}
+
+	// Setting up: step 1 offline, step 2 once online.
+	s.LANIP = func() string { return "" }
+	if page := get(s.Handler(), "127.0.0.1:1", "127.0.0.1:8686", "/tv").Body.String(); !strings.Contains(page, "Step 1 of 2") {
+		t.Error("offline page lacks step 1 of 2")
+	}
+	s.LANIP = func() string { return "192.168.0.42" }
+	if page := get(s.Handler(), "127.0.0.1:1", "127.0.0.1:8686", "/tv?setup=1").Body.String(); !strings.Contains(page, "Step 2 of 2") {
+		t.Error("online page after setup lacks step 2 of 2")
+	}
+
+	// A phone connected before: "another phone", no setup steps.
+	s.Pairing.MarkPaired()
+	another := get(s.Handler(), "127.0.0.1:1", "127.0.0.1:8686", "/tv?setup=1").Body.String()
+	if !strings.Contains(another, "Connect another phone") || strings.Contains(another, "Step 2 of 2") {
+		t.Error("with a phone paired before, the page should be Connect another phone, without steps")
+	}
+}
+
+func TestPINDigits(t *testing.T) {
+	d := pinDigits("482913")
+	if strings.Join(d[0], "") != "482" || strings.Join(d[1], "") != "913" {
+		t.Errorf("pinDigits = %v", d)
+	}
 }

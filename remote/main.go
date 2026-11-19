@@ -107,6 +107,19 @@ func main() {
 		srv.Laptop = laptop
 		go laptop.Watch(ctx, 10*time.Second)
 	}
+	// init-hooks.sh sets this property once the sound goes to the TV.
+	srv.Audio = func() string {
+		cctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		defer cancel()
+		if out, err := exec.CommandContext(cctx, "getprop", "hal.audio.out.hdmi").Output(); err == nil &&
+			strings.TrimSpace(string(out)) != "" {
+			return "tv"
+		}
+		if srv.Laptop != nil {
+			return "notebook"
+		}
+		return ""
+	}
 
 	if *useHotkeys {
 		android := &hotkeys.Android{}

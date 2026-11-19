@@ -3,48 +3,83 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{index .Texts "title"}}</title>
+<title>{{if .Another}}{{index .Texts "another"}}{{else}}{{index .Texts "title"}}{{end}}</title>
 <link rel="stylesheet" href="/tv.css">
 <script src="/tv.js" defer></script>
 </head>
 <body>
+<!-- Drawn at the design's 1920x1080 and scaled to the screen (tv.js). -->
+<div class="stage" id="stage">
+<div class="glow" aria-hidden="true"></div>
+
+<header class="top">
+  <div class="brand"><img src="/icon.svg" alt="" width="56" height="56"><span>Otto TV</span></div>
+  {{if .Step}}<div class="step" id="step">{{.Step}}</div>{{end}}
+  <div class="status">
+    <div class="pill">
+      <svg class="net{{if not .QR}} off{{end}}" viewBox="0 0 24 24" role="img" aria-label="{{if .QR}}{{index .Texts "online"}}{{else}}{{index .Texts "offline"}}{{end}}"><path class="arc" d="M2.5 9a14 14 0 0 1 19 0"/><path class="arc" d="M5.5 12.5a9.5 9.5 0 0 1 13 0"/><path class="arc" d="M8.8 16a5 5 0 0 1 6.4 0"/><path d="M12 19.5h.01"/><path class="slash" d="M4 3.5l16 17"/></svg>
+      <div class="item" id="audio"{{if not .Audio}} hidden{{end}} data-tv="{{index .Texts "audioTV"}}" data-notebook="{{index .Texts "audioNb"}}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5v5h3.5L13 19V5L7.5 9.5H4z"/><path d="M16.5 9a4.5 4.5 0 0 1 0 6"/><path d="M19 6.5a8 8 0 0 1 0 11"/></svg>
+        <span id="audio-label">{{if eq .Audio "tv"}}{{index .Texts "audioTV"}}{{else}}{{index .Texts "audioNb"}}{{end}}</span>
+      </div>
+      <div class="item{{if not .Phone}} dim{{end}}" id="phone">
+        <svg viewBox="0 0 24 24" role="img" aria-label="{{if .Phone}}{{index .Texts "phone"}}{{else}}{{index .Texts "noPhone"}}{{end}}"><path d="M8.5 2.5h7a2 2 0 0 1 2 2v15a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-15a2 2 0 0 1 2-2z"/><path d="M11 18h2"/></svg>
+        <span id="phone-label"{{if not .Phone}} hidden{{end}}>{{index .Texts "phone"}}</span>
+      </div>
+    </div>
+    <span class="clock" id="clock"></span>
+  </div>
+</header>
+
 {{if .QR}}
-<main class="connect" id="connect">
+<main class="pair" id="connect">
+  <h1>{{if .Another}}{{index .Texts "another"}}{{else}}{{index .Texts "title"}}{{end}}</h1>
   <div class="qr" id="qr">{{.QR}}</div>
+  <div class="actions">
+    <button class="secondary" data-action="openBluetooth" data-focus>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></svg>
+      <span>{{index .Texts "bluetooth"}}</span>
+    </button>
+  </div>
   <section class="steps">
-    <h1>{{index .Texts "title"}}</h1>
     <ol>
-      <li>{{index .Texts "step1"}}</li>
-      <li>{{index .Texts "step2"}}</li>
-      <li>{{index .Texts "step3"}}</li>
+      <li><span class="n" aria-hidden="true">1</span><span>{{index .Texts "step1"}}</span></li>
+      <li><span class="n" aria-hidden="true">2</span><span>{{index .Texts "step2"}}</span></li>
+      <li><span class="n" aria-hidden="true">3</span><span>{{index .Texts "step3"}}</span></li>
     </ol>
+    <hr>
     <p class="manual">{{index .Texts "manual"}}</p>
-    <p class="address"><span id="url">{{.URL}}</span></p>
-    <p class="pin" id="pin" aria-label="PIN">{{.PIN}}</p>
-    <div class="actions">
-      <button class="secondary" data-action="openBluetooth">{{index .Texts "bluetooth"}}</button>
-      <p class="tip">{{index .Texts "skip"}}</p>
+    <p class="address" id="url">http://{{.URL}}</p>
+    <div class="pin" id="pin" role="img" aria-label="{{.PIN}}">
+      {{range .Digits}}<div class="group">{{range .}}<span class="digit">{{.}}</span>{{end}}</div>{{end}}
     </div>
   </section>
 </main>
 {{else}}
-<main class="connect offline" id="connect">
-  <section class="steps">
-    <p class="step">{{index .Texts "firstStep"}}</p>
-    <h1>{{index .Texts "wifiTitle"}}</h1>
-    <p class="lead">{{index .Texts "wifiText"}}</p>
-    <div class="actions">
-      <button class="primary" data-action="openWifi" data-focus>{{index .Texts "wifiButton"}}</button>
-      <button class="secondary" data-action="openBluetooth">{{index .Texts "bluetooth"}}</button>
-    </div>
-    <p class="tip">{{index .Texts "skip"}}</p>
-  </section>
+<main class="wifi" id="connect">
+  <img class="otto" src="/otto-wave.svg" alt="" width="280" height="280">
+  <h1>{{index .Texts "wifiTitle"}}</h1>
+  <p class="lead">{{index .Texts "wifiText"}}</p>
+  <div class="actions">
+    <button class="primary" data-action="openWifi" data-focus>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 9a14 14 0 0 1 19 0 M5.5 12.5a9.5 9.5 0 0 1 13 0 M8.8 16a5 5 0 0 1 6.4 0 M12 19.5h.01"/></svg>
+      <span>{{index .Texts "wifiButton"}}</span>
+    </button>
+    <button class="secondary" data-action="openBluetooth">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></svg>
+      <span>{{index .Texts "bluetooth"}}</span>
+    </button>
+  </div>
 </main>
 {{end}}
+
 <main class="done" id="done" hidden>
-  <svg viewBox="0 0 96 96" aria-hidden="true"><circle cx="48" cy="48" r="44"/><path d="M28 50l13 13 27-29"/></svg>
+  <img class="otto" src="/otto-cheer.svg" alt="" width="340" height="340">
   <h1>{{index .Texts "connected"}}</h1>
-  <p>{{index .Texts "close"}}</p>
+  <p class="lead">{{index .Texts "close"}}</p>
 </main>
+
+<p class="hint" id="hint">{{if .Another}}{{index .Texts "close"}}{{else}}{{index .Texts "skip"}}{{end}}</p>
+</div>
 </body>
 </html>

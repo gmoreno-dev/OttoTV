@@ -110,6 +110,12 @@ func (p *Pairing) MarkPaired() {
 	os.WriteFile(path, []byte(p.now().Format(time.RFC3339)+"\n"), 0o600)
 }
 
+// Paired reports whether a phone has ever connected (see MarkPaired).
+func (p *Pairing) Paired() bool {
+	_, err := os.Stat(filepath.Join(p.dir, "paired"))
+	return err == nil
+}
+
 func randomHex(n int) (string, error) {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {

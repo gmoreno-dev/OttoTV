@@ -13,6 +13,7 @@
 //   iso/otto/installer/wallpaper.png          installer desktop
 //   tvapp/res/drawable*/{icon,banner,preparing,loading}.png  "Connect phone" app
 //   remote/web/static/icon-*.png              phone remote (home screen icon)
+//   remote/web/static/{otto-*.svg,inter.woff2}  "Connect phone" and the remote
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -212,6 +213,19 @@ async function phoneRemote(browser) {
   await render(browser, icon(512), path.join(ROOT, 'remote/web/static/icon-512.png'), { opaque: true });
   fs.writeFileSync(path.join(ROOT, 'remote/web/static/icon.svg'), svgFile('logo.svg'));
   console.log('wrote remote/web/static/icon.svg');
+  // Otto on the "Connect phone" screen and the remote, sized like the
+  // design's (its body spans 60 of 120 units there).
+  const otto = (name, vb, art) => {
+    const out = path.join(ROOT, 'remote/web/static', name);
+    fs.writeFileSync(out, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + vb + '">' + art + '</svg>\n');
+    console.log('wrote', path.relative(ROOT, out));
+  };
+  otto('otto-wave.svg', '32 31 136 136', G.pose('wave'));
+  otto('otto-cheer.svg', '20 16 160 160', G.pose('cheer'));
+  otto('otto-think.svg', '32 31 136 136', G.pose('think'));
+  // Inter, the brand's typeface (SIL OFL, art/fonts/LICENSE-Inter.txt).
+  fs.copyFileSync(path.join(ROOT, 'art/fonts/inter-latin-wght-normal.woff2'), path.join(ROOT, 'remote/web/static/inter.woff2'));
+  console.log('wrote remote/web/static/inter.woff2');
 }
 
 (async () => {

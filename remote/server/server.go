@@ -33,6 +33,7 @@ type Server struct {
 	Static  fs.FS              // the phone remote page
 	TVPage  *template.Template // the "Connect phone" screen
 	LANIP   func() string      // the TV's address on the home network
+	Audio   func() string      // where the sound goes: "tv", "notebook" or ""; may be nil
 
 	phones  atomic.Int32
 	pairsAt atomic.Int64 // unix nanos of the last phone that connected
@@ -220,12 +221,17 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 
 // TVPageData fills the "Connect phone" template.
 type TVPageData struct {
-	Name  string
-	URL   string // address to type by hand, without the token
-	QR    template.HTML
-	PIN   string
-	Lang  string
-	Texts map[string]string
+	Name    string
+	URL     string // address to type by hand, without the token
+	QR      template.HTML
+	PIN     string
+	Digits  [2][]string // the PIN in two groups of three, as the TV shows it
+	Lang    string
+	Texts   map[string]string
+	Step    string // "Passo 1 de 2"... while setting up: Wi-Fi first, then the phone
+	Another bool   // a phone has connected before: "Connect another phone"
+	Audio   string // see Server.Audio
+	Phone   bool   // a phone is connected now
 }
 
 func (s *Server) handleTV(w http.ResponseWriter, r *http.Request) {
@@ -236,7 +242,19 @@ func (s *Server) handleTV(w http.ResponseWriter, r *http.Request) {
 	}
 	base := s.baseURL()
 	lang := pickLang(r.Header.Get("Accept-Language"))
-	data := TVPageData{Name: s.Name, PIN: pin, Lang: lang, Texts: tvTexts[lang]}
+	data := TVPageData{
+		Name: s.Name, PIN: pin, Digits: pinDigits(pin), Lang: lang, Texts: tvTexts[lang],
+		Another: s.Pairing.Paired(), Audio: s.audio(), Phone: s.phones.Load() > 0,
+	}
+	// The steps show while setting up: offline, the Wi-Fi comes first; the
+	// page comes back with ?setup=1 once the TV is online.
+	if !data.Another {
+		if base == "" {
+			data.Step = data.Texts["firstStep"]
+		} else if r.URL.Query().Get("setup") == "1" {
+			data.Step = data.Texts["secondStep"]
+		}
+	}
 	if base == "" {
 		data.URL = ""
 	} else {
@@ -263,7 +281,24 @@ func (s *Server) handleTVStatus(w http.ResponseWriter, r *http.Request) {
 		"url":      strings.TrimPrefix(s.baseURL(), "http://"),
 		"phones":   s.phones.Load(),
 		"pairedAt": s.pairsAt.Load() / int64(time.Millisecond),
+		"audio":    s.audio(),
 	})
+}
+
+func (s *Server) audio() string {
+	if s.Audio == nil {
+		return ""
+	}
+	return s.Audio()
+}
+
+// pinDigits splits "482913" into 4 8 2 and 9 1 3.
+func pinDigits(pin string) [2][]string {
+	var d [2][]string
+	for i, r := range pin {
+		d[min(i/3, 1)] = append(d[min(i/3, 1)], string(r))
+	}
+	return d
 }
 
 func (s *Server) baseURL() string {
@@ -291,11 +326,20 @@ var tvTexts = map[string]map[string]string{
 		"connected":  "Celular conectado!",
 		"close":      "Aperte Voltar para sair.",
 		"firstStep":  "Passo 1 de 2",
+		"secondStep": "Passo 2 de 2",
 		"wifiTitle":  "Conecte a TV ao Wi-Fi",
 		"wifiText":   "Depois disso, o código para conectar o celular aparece aqui.",
 		"wifiButton": "Escolher rede Wi-Fi",
 		"bluetooth":  "Parear controle Bluetooth",
 		"skip":       "Aperte Voltar para pular. Esta tela fica em Conectar celular, na lista de apps.",
+		"another":    "Conectar outro celular",
+		"online":     "Wi-Fi conectado",
+		"offline":    "Sem internet",
+		"phone":      "Celular",
+		"noPhone":    "Nenhum celular conectado",
+		"audioTV":    "TV",
+		"audioNb":    "Notebook",
+		"sound":      "O som sai pela",
 	},
 	"en": {
 		"title":      "Connect your phone",
@@ -306,11 +350,20 @@ var tvTexts = map[string]map[string]string{
 		"connected":  "Phone connected!",
 		"close":      "Press Back to close.",
 		"firstStep":  "Step 1 of 2",
+		"secondStep": "Step 2 of 2",
 		"wifiTitle":  "Connect the TV to Wi-Fi",
 		"wifiText":   "Then the code to connect your phone shows up here.",
 		"wifiButton": "Choose a Wi-Fi network",
 		"bluetooth":  "Pair a Bluetooth remote",
 		"skip":       "Press Back to skip. This screen stays in Connect phone, in your apps.",
+		"another":    "Connect another phone",
+		"online":     "Wi-Fi connected",
+		"offline":    "No internet",
+		"phone":      "Phone",
+		"noPhone":    "No phone connected",
+		"audioTV":    "TV",
+		"audioNb":    "Laptop",
+		"sound":      "Sound plays on the",
 	},
 }
 
