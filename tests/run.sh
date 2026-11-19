@@ -15,8 +15,9 @@ expect() { # <name> <expected> <actual>
 	if [ "$2" = "$3" ]; then pass "$1"; else fail "$1" "expected '$2', got '$3'"; fi
 }
 
-# otto-remote's folder (the sound's choice lives there): never this machine's.
-export OTTO_STATE="$TMP/otto-state"
+# otto-remote's folder (the sound's choice lives there) and sysfs (GPU
+# clocks, read-ahead): never this machine's.
+export OTTO_STATE="$TMP/otto-state" OTTO_SYSFS="$TMP/no-sysfs"
 mkdir -p "$OTTO_STATE"
 # shellcheck source=iso/otto/init-hooks.sh
 source "$ROOT/iso/otto/init-hooks.sh"
@@ -955,6 +956,21 @@ expect "compile: OTTO_COMPILE=off" "" "$(cat "$TMP/calls")"
 unset -f otto_detach sleep pm cmd log
 # shellcheck source=iso/otto/init-hooks.sh
 source "$ROOT/iso/otto/init-hooks.sh"
+
+# GPU clock floor: Intel's RP1 where it is above the current minimum.
+mkdir -p "$TMP/gpu/class/drm/card0" "$TMP/gpu/class/drm/card0-HDMI-A-1" "$TMP/gpu/class/drm/card1"
+echo 650 >"$TMP/gpu/class/drm/card0/gt_RP1_freq_mhz"
+echo 350 >"$TMP/gpu/class/drm/card0/gt_min_freq_mhz"
+echo 300 >"$TMP/gpu/class/drm/card1/gt_RP1_freq_mhz"
+echo 400 >"$TMP/gpu/class/drm/card1/gt_min_freq_mhz"
+OTTO_SYSFS="$TMP/gpu" otto_setup_gpu
+expect "gpu: Intel's minimum clock goes up to RP1, never down" "650|400" \
+	"$(cat "$TMP/gpu/class/drm/card0/gt_min_freq_mhz")|$(cat "$TMP/gpu/class/drm/card1/gt_min_freq_mhz")"
+echo 350 >"$TMP/gpu/class/drm/card0/gt_min_freq_mhz"
+OTTO_GPU=off OTTO_SYSFS="$TMP/gpu" otto_setup_gpu
+expect "gpu: OTTO_GPU=off keeps the default" "350" "$(cat "$TMP/gpu/class/drm/card0/gt_min_freq_mhz")"
+OTTO_SYSFS="$TMP/none" otto_setup_gpu
+expect "gpu: no Intel GPU, nothing to do" "0" "$?"
 
 # --- Boot prefetch (initrd hook) ---------------------------------------------------
 

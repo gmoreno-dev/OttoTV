@@ -4,7 +4,7 @@ Turn an old PC or laptop into a fast, plug-and-play Android TV for any TV.
 Flash a USB stick, plug the computer into the TV over HDMI, try it live, then
 install it.
 
-> Status: **v0.6.0, early development.** Tested on one machine so far:
+> Status: **v0.6.1, early development.** Tested on one machine so far:
 > [Acer HM77 / Ivy Bridge](docs/hardware/acer-hm77-ivybridge.md).
 
 **What it needs:** a 64-bit PC with SSE4.2 (Android 14 requires it: Intel
@@ -155,7 +155,10 @@ moving to a new upstream release is mostly bumping the ISO hash.
 - **A home screen light on old GPUs.** Its backdrop is drawn once per color
   into a GPU layer, and shadows and the focus glow are blurred once into
   masks: frames copy them instead of computing five full-screen gradients
-  and blurs each time.
+  and blurs each time. Intel GPUs also get RP1 (their most efficient clock)
+  as their lowest one: they start each burst of work at the bottom, and a
+  200 ms animation ends before they ramp up (on the Acer: 8 ms of GPU per
+  frame at 350 MHz, 5 ms at 650).
 - **Compressed memory (zram) that actually turns on.** Upstream's zram
   script dies on the `BOOT_IMAGE=(hd96)/kernel` GRUB adds to the command
   line, so no machine got it. Otto TV fixes the script at boot; it matters
@@ -239,6 +242,7 @@ in Android's `init.sh`, which both upstream and our hooks read.
 | `OTTO_LAUNCHER`   | `ours`              | `upstream` keeps upstream's home screen (and leaves the home screen choice alone) |
 | `OTTO_PREFETCH`   | `on`                | `off` doesn't read ahead what the boot needs |
 | `OTTO_COMPILE`    | `on`                | `off` doesn't compile installed apps ahead of time |
+| `OTTO_GPU`        | `auto`              | `off` keeps Intel GPUs' lowest clock as the floor (by default it is RP1) |
 | `SET_TZ_LOCATION` | `America/Sao_Paulo` | Time zone (upstream option) |
 
 To try one without rebuilding, press `e` on a menu entry, append it to the

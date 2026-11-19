@@ -128,6 +128,25 @@ otto_setup_audio() {
 	otto_log "audio: display on HDMI, routing sound to $pcm"
 }
 
+# ---- GPU clock ------------------------------------------------------------------
+# Intel GPUs start each burst of work at their lowest clock (350 MHz on the
+# Acer's HD 4000), and a 200 ms animation is over before it ramps up: the
+# home screen's frames took 8 ms of GPU time at 350 MHz and 5 ms at 650
+# (RP1, the clock the GPU is most efficient at). So RP1 becomes the floor.
+# Idle, the GPU still powers down (RC6). OTTO_GPU=off keeps the default.
+otto_setup_gpu() {
+	local card min rp1
+	[ "${OTTO_GPU:-auto}" = auto ] || return 0
+	for card in "${OTTO_SYSFS:-/sys}"/class/drm/card[0-9]; do
+		rp1=$(cat "$card/gt_RP1_freq_mhz" 2>/dev/null) || continue
+		min=$(cat "$card/gt_min_freq_mhz" 2>/dev/null) || continue
+		[ "$rp1" -gt "$min" ] 2>/dev/null || continue
+		echo "$rp1" >"$card/gt_min_freq_mhz" &&
+			otto_log "gpu: ${card##*/} runs at $rp1 MHz or more (was $min)"
+	done
+	return 0
+}
+
 # ---- On-screen keyboard ------------------------------------------------------
 # Android TV's keyboard (LeanbackIME) shows up even with a physical keyboard
 # plugged in: it overrides that check on purpose, so no setting hides it.
@@ -410,6 +429,7 @@ post_init() {
 	# Persistent props load later and win, so a language the user picked stays.
 	set_prop_if_empty persist.sys.locale "${OTTO_LOCALE:-pt-BR}"
 	otto_setup_mirror
+	otto_setup_gpu
 	otto_setup_audio
 }
 
