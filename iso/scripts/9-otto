@@ -12,8 +12,8 @@
 
 # To the console and to the kernel log, so `dmesg | grep otto` on the
 # running system shows what happened here too.
+# To the kernel log only (dmesg | grep otto:): the screen shows Otto.
 otto_msg() {
-	echo "otto: $*"
 	echo "otto: $*" >"${OTTO_KMSG:-/dev/kmsg}" 2>/dev/null
 }
 

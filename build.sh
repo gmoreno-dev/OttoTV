@@ -25,7 +25,7 @@ OUT="$ROOT/out"
 die() { echo "error: $*" >&2; exit 1; }
 log() { echo "==> $*"; }
 
-for tool in xorriso curl python3 sha256sum sed; do
+for tool in xorriso curl python3 sha256sum sed cpio gzip; do
 	command -v "$tool" >/dev/null ||
 		die "'$tool' not found (Debian/Ubuntu/WSL: sudo apt install xorriso curl python3)"
 done
@@ -43,7 +43,9 @@ if [ ! -f "$UPSTREAM_ISO" ]; then
 	mv "$UPSTREAM_ISO.part" "$UPSTREAM_ISO"
 fi
 
-if [ -n "$UPSTREAM_ISO_SHA256" ]; then
+# OTTO_SKIP_HASH=1 accepts another upstream ISO: tests boot a trimmed copy
+# (no Android system) in a virtual machine to check the boot menu.
+if [ -n "$UPSTREAM_ISO_SHA256" ] && [ -z "${OTTO_SKIP_HASH:-}" ]; then
 	log "Checking upstream ISO hash"
 	echo "$UPSTREAM_ISO_SHA256  $UPSTREAM_ISO" | sha256sum -c --quiet - ||
 		die "upstream ISO hash mismatch"
@@ -69,16 +71,24 @@ find "$STAGE" -name __pycache__ -prune -exec rm -rf {} +
 # Installed systems don't use our GRUB menu: the upstream installer writes
 # the first line of /cmdline.txt into their boot entries instead, so our
 # defaults go there too.
-printf '%s\n' "$EXTRA_KERNEL_ARGS SETUPWIZARD=0" >"$STAGE/cmdline.txt"
+# quiet, loglevel=3 and the hidden cursor: a clean screen with only Otto
+# until the boot animation, as on the USB stick.
+printf '%s\n' "quiet loglevel=3 vt.global_cursor_default=0 $EXTRA_KERNEL_ARGS SETUPWIZARD=0" >"$STAGE/cmdline.txt"
 
 export PRODUCT_NAME VERSION ISO_LABEL BOOT_TIMEOUT EXTRA_KERNEL_ARGS
 "$ROOT/tools/render-grub.sh" "$ROOT/iso/boot/grub/grub.cfg.in" "$STAGE/grub/grub.cfg"
+# The boot menu's theme; the installer copies it for installed systems too.
+cp -r "$ROOT/iso/boot/grub/themes/otto" "$STAGE/grub/theme"
+mkdir -p "$STAGE/otto/installer"
+cp -r "$ROOT/iso/boot/grub/themes/otto" "$STAGE/otto/installer/grub-theme"
+# Installed menus have 3 items at most (no "Install"): the hints go up a row.
+sed -i 's/top = 44%+236/top = 44%+184/' "$STAGE/otto/installer/grub-theme/theme.txt"
 
-xorriso -osirrox on -indev "$UPSTREAM_ISO" \
-	-extract /boot/grub/functions.cfg "$STAGE/grub/functions.cfg" 2>/dev/null ||
-	die "could not extract /boot/grub/functions.cfg from the upstream ISO"
-chmod u+w "$STAGE/grub/functions.cfg"
-"$ROOT/tools/patch-functions-cfg.sh" "$STAGE/grub/functions.cfg"
+# The initrd: upstream's, with a quiet boot screen showing Otto (see
+# tools/patch-initrd.sh). Installed systems get it from the installer.
+xorriso -osirrox on -indev "$UPSTREAM_ISO" -extract /initrd.img "$STAGE/initrd.upstream.img" 2>/dev/null ||
+	die "could not extract /initrd.img from the upstream ISO"
+"$ROOT/tools/patch-initrd.sh" "$STAGE/initrd.upstream.img" "$STAGE/initrd.img"
 
 # 4. Phone remote: the service (Go) and the "Connect phone" TV app ------------
 log "Building the phone remote"
@@ -104,7 +114,9 @@ chmod 755 "$REMOTE_BIN"
 # apps.lock records exactly which build of each app went into this ISO.
 log "Fetching apps from F-Droid"
 : >"$STAGE/otto/apps.lock"
+# OTTO_NO_APPS=1 leaves them out (offline test builds).
 while read -r source id; do
+	[ -z "${OTTO_NO_APPS:-}" ] || break
 	case "$source" in '' | '#'*) continue ;; esac
 	[ "$source" = fdroid ] || die "apps.txt: unknown source '$source' (expected: fdroid)"
 
@@ -165,8 +177,10 @@ log "Writing $OUT_ISO"
 xorriso -indev "$UPSTREAM_ISO" -outdev "$TMP_ISO" \
 	-volid "$ISO_LABEL" \
 	-map "$STAGE/grub/grub.cfg" /boot/grub/grub.cfg \
-	-map "$STAGE/grub/functions.cfg" /boot/grub/functions.cfg \
+	-map "$STAGE/grub/theme" /boot/grub/themes/otto \
+	-rm_r /boot/grub/themes/blissos-white-1080p /boot/grub/functions.cfg -- \
 	-map "$STAGE/cmdline.txt" /cmdline.txt \
+	-map "$STAGE/initrd.img" /initrd.img \
 	-map "$STAGE/scripts" /scripts \
 	-map "$STAGE/otto" /otto \
 	-map "$STAGE/mountpoint" /boot/otto \

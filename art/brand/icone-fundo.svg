@@ -1,0 +1,3 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Fundo do ícone do Otto TV">
+<defs><linearGradient id="bga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2E3644"></stop><stop offset="1" stop-color="#191E26"></stop></linearGradient><radialGradient id="gla" cx="0.5" cy="0.38" r="0.42"><stop offset="0" stop-color="#F2B25C" stop-opacity="0.16"></stop><stop offset="1" stop-color="#F2B25C" stop-opacity="0"></stop></radialGradient></defs><rect width="512" height="512" fill="url(#bga)"></rect><rect width="512" height="512" fill="url(#gla)"></rect>
+</svg>

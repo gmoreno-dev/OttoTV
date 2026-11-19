@@ -276,27 +276,92 @@ source "$ROOT/iso/otto/init-hooks.sh"
 
 # --- GRUB menu ----------------------------------------------------------------
 
-cp "$FIX/upstream-functions.cfg" "$TMP/functions.cfg"
-if "$ROOT/tools/patch-functions-cfg.sh" "$TMP/functions.cfg" 2>/dev/null; then
-	pass "grub: functions.cfg patch applies to upstream"
-else
-	fail "grub: functions.cfg patch applies to upstream" "script failed"
-fi
-if grep -q 'hwacccel' "$TMP/functions.cfg"; then
-	fail "grub: hwaccel typo fixed" "\$hwacccel still present"
-else
-	pass "grub: hwaccel typo fixed"
-fi
-
-if PRODUCT_NAME="Otto TV" VERSION="0.1.0" ISO_LABEL="LineageOS_20260331" \
+if PRODUCT_NAME="Otto TV" VERSION="0.1.0" ISO_LABEL="OTTO_TV" \
 	BOOT_TIMEOUT=5 EXTRA_KERNEL_ARGS="SET_TZ_LOCATION=America/Sao_Paulo" \
 	"$ROOT/tools/render-grub.sh" "$ROOT/iso/boot/grub/grub.cfg.in" "$TMP/grub.cfg" 2>/dev/null; then
 	pass "grub: template renders"
 else
 	fail "grub: template renders" "render-grub.sh failed"
 fi
-expect "grub: boot media label kept" "1" \
-	"$(grep -c 'ROOT=LABEL=LineageOS_20260331 ' "$TMP/grub.cfg")"
+expect "grub: every entry finds the boot media by our label" "3" \
+	"$(grep -c '^\s*linux .*\$KERNEL_ARGS' "$TMP/grub.cfg")"
+expect "grub: the label is in the kernel arguments" "1" \
+	"$(grep -c 'ROOT=LABEL=OTTO_TV ' "$TMP/grub.cfg")"
+expect "grub: the menu, in order" \
+	"Otto TV|Instalar o Otto TV neste computador|Otto TV em modo de vídeo seguro|Configurações do computador (UEFI)" \
+	"$(sed -n 's/^\s*menuentry "\([^"]*\)".*/\1/p' "$TMP/grub.cfg" | paste -sd'|')"
+expect "grub: firmware settings only on UEFI" "if is_efi; then" \
+	"$(grep -B1 'Configurações do computador' "$TMP/grub.cfg" | head -n 1)"
+expect "grub: no upstream names left" "" \
+	"$(grep -i -o 'lineage\|bliss\|tv box\|android-x86' "$TMP/grub.cfg")"
+
+# The theme only names files and fonts that exist.
+theme="$ROOT/iso/boot/grub/themes/otto"
+missing=""
+for f in $(sed -n 's/^\s*file = "\(.*\)"/\1/p' "$theme/theme.txt"); do
+	[ -f "$theme/$f" ] || missing="$missing $f"
+done
+for style in $(sed -n 's/^\s*\(item\|selected_item\)_pixmap_style = "\(.*\)\*\.png"/\2/p' "$theme/theme.txt"); do
+	for part in nw n ne w c e sw s se; do
+		[ -f "$theme/$style$part.png" ] || missing="$missing $style$part.png"
+	done
+done
+expect "grub theme: every image exists" "" "$missing"
+fonts=$(for f in "$theme"/*.pf2; do strings "$f" | sed -n '/^PFF2NAME$/{n;p;q}'; done | sort -u | paste -sd'|')
+used=$(sed -n 's/.*font = "\(.*\)"/\1/p; s/^terminal-font: "\(.*\)"/\1/p' "$theme/theme.txt" | sort -u | paste -sd'|')
+expect "grub theme: the fonts it names are the ones it ships" "$fonts" "$used"
+
+# --- Boot screen (initrd) -------------------------------------------------------
+
+cp "$FIX/upstream-initrd-init" "$TMP/init"
+if python3 "$ROOT/tools/patch_initrd_init.py" "$TMP/init"; then
+	pass "initrd: patch applies to upstream's /init"
+else
+	fail "initrd: patch applies to upstream's /init" "patch_initrd_init.py failed"
+fi
+if dash -n "$TMP/init" 2>/dev/null || sh -n "$TMP/init"; then
+	pass "initrd: patched /init is valid shell"
+else
+	fail "initrd: patched /init is valid shell" "syntax error"
+fi
+expect "initrd: no upstream logo or chatter left" "0" \
+	"$(grep -c -e '#\*\*\*' -e 'WARNING: NTFS' -e 'Detecting Android-x86' -e 'Scanning \$dev' -e 'console shell' "$TMP/init")"
+expect "initrd: the kernel command line isn't printed" "1" \
+	"$(grep -c 'if ! grep -q androidboot.slot_suffix' "$TMP/init")"
+if python3 "$ROOT/tools/patch_initrd_init.py" "$TMP/init" 2>/dev/null; then
+	fail "initrd: a changed upstream stops the build" "patched twice without complaint"
+else
+	pass "initrd: a changed upstream stops the build"
+fi
+
+# text_art centers Otto on a 170x48 console (1366x768 with the 8x16 font).
+art=$(
+	# shellcheck disable=SC2329  # mocks
+	clear() { :; }
+	# shellcheck disable=SC2329
+	stty() { echo "48 170"; }
+	eval "$(sed -n '/^text_art() {/,/^}/p' "$TMP/init")"
+	OTTO_ART="$ROOT/art/brand/otto-ascii.txt" text_art
+)
+expect "initrd: Otto starts 14 lines down" "14" \
+	"$(printf '%s\n' "$art" | awk 'NF { print NR - 1; exit }')"
+expect "initrd: Otto is centered (47 more spaces)" \
+	"$(printf '%47s%s' '' "$(head -n 1 "$ROOT/art/brand/otto-ascii.txt")")" \
+	"$(printf '%s\n' "$art" | sed -n 15p)"
+expect "initrd: the art is plain ASCII, 76x20 at most" "ok" \
+	"$(LC_ALL=C awk 'length($0) > 76 || /[^ -~]/ { bad = 1 } END { print (NR <= 20 && !bad) ? "ok" : "bad" }' "$ROOT/art/brand/otto-ascii.txt")"
+
+# patch-initrd.sh keeps upstream's archive and appends ours.
+mkdir -p "$TMP/ird"
+cp "$FIX/upstream-initrd-init" "$TMP/ird/init"
+echo hello >"$TMP/ird/other"
+(cd "$TMP/ird" && printf '%s\n' init other | cpio -o -H newc --quiet | gzip -9n) >"$TMP/up.img"
+"$ROOT/tools/patch-initrd.sh" "$TMP/up.img" "$TMP/new.img"
+size=$(wc -c <"$TMP/up.img")
+expect "initrd: upstream's archive kept byte for byte" "same" \
+	"$(cmp -s <(head -c "$size" "$TMP/new.img") "$TMP/up.img" && echo same)"
+expect "initrd: our archive replaces /init and adds the art" "init|otto-ascii.txt" \
+	"$(tail -c +$((size + 1)) "$TMP/new.img" | gzip -dc | cpio -t --quiet 2>/dev/null | paste -sd'|')"
 
 # --- Installer (Calamares) patch ------------------------------------------------
 

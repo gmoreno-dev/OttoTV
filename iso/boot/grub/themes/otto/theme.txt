@@ -1,0 +1,65 @@
+# Otto TV boot menu. Drawn for 1366x768 (design: Bootmenu-768) and placed
+# from the screen's center and top, so other modes keep the same layout.
+# The images and fonts come from tools/brand/grub-theme.py and
+# tools/brand/make-assets.js. Solid colors only: GRUB has no transparency.
+title-text: ""
+desktop-color: "#161B22"
+terminal-font: "Otto Regular 24"
+
++ image {
+	file = "logo.png"
+	left = 50%-135
+	top = 27%
+	width = 271
+	height = 84
+}
+
+# Each item is a 46 px pill, 6 px apart. GRUB draws a pill's 12 px corners
+# outside the item, so items are 22 px tall with 30 px between them (52 px
+# rows), inset 12 px in the list, with the text 12 px further in: the pills
+# span the list's 748 px and the text sits 24 px into them. Room for 4 items
+# (the USB stick's menu); fewer leave no trace, the list has no background.
++ boot_menu {
+	left = 50%-374
+	top = 44%+4
+	width = 748
+	height = 202
+	item_pixmap_style = "item_*.png"
+	selected_item_pixmap_style = "select_*.png"
+	item_font = "Otto Regular 28"
+	selected_item_font = "Otto Regular 28"
+	item_color = "#F4F6F9"
+	selected_item_color = "#15191F"
+	item_height = 22
+	item_padding = 12
+	item_spacing = 30
+	icon_width = 0
+	icon_height = 0
+	item_icon_space = 12
+	scrollbar = false
+}
+
+# Under the list: 30 px below 4 items. build.sh moves them up for installed
+# systems, whose menus have 3 items at most.
++ label {
+	left = 50%-374
+	top = 44%+236
+	width = 748
+	height = 32
+	align = "left"
+	font = "Otto Regular 24"
+	color = "#A9B3C1"
+	text = "↑ ↓ para escolher · Enter para iniciar"
+}
+
++ label {
+	id = "__timeout__"
+	left = 50%-374
+	top = 44%+236
+	width = 748
+	height = 32
+	align = "right"
+	font = "Otto Regular 24"
+	color = "#A9B3C1"
+	text = "Começa sozinho em %d s"
+}
