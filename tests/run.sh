@@ -354,17 +354,22 @@ expect "initrd: the art is plain ASCII, 76x20 at most" "ok" \
 	"$(LC_ALL=C awk 'length($0) > 76 || /[^ -~]/ { bad = 1 } END { print (NR <= 20 && !bad) ? "ok" : "bad" }' "$ROOT/art/brand/otto-ascii.txt")"
 
 # patch-initrd.sh keeps upstream's archive and appends ours.
-mkdir -p "$TMP/ird"
+mkdir -p "$TMP/ird/scripts"
 cp "$FIX/upstream-initrd-init" "$TMP/ird/init"
+cp "$FIX/upstream-initrd-4-fstab-fallback" "$TMP/ird/scripts/4-fstab-fallback"
 echo hello >"$TMP/ird/other"
 # Named like upstream's, with a leading "./".
-(cd "$TMP/ird" && printf '%s\n' ./init ./other | cpio -o -H newc --quiet | gzip -9n) >"$TMP/up.img"
+(cd "$TMP/ird" && printf '%s\n' ./init ./scripts ./scripts/4-fstab-fallback ./other |
+	cpio -o -H newc --quiet | gzip -9n) >"$TMP/up.img"
 "$ROOT/tools/patch-initrd.sh" "$TMP/up.img" "$TMP/new.img"
 size=$(wc -c <"$TMP/up.img")
 expect "initrd: upstream's archive kept byte for byte" "same" \
 	"$(cmp -s <(head -c "$size" "$TMP/new.img") "$TMP/up.img" && echo same)"
-expect "initrd: our archive replaces /init and adds the art" "init|otto-ascii.txt" \
+expect "initrd: our archive replaces /init and the fstab script, adds the art" \
+	"init|scripts/4-fstab-fallback|otto-ascii.txt" \
 	"$(tail -c +$((size + 1)) "$TMP/new.img" | gzip -dc | cpio -t --quiet 2>/dev/null | paste -sd'|')"
+expect "initrd: building the live fstab is quiet" "0" \
+	"$(tail -c +$((size + 1)) "$TMP/new.img" | gzip -dc | cpio -i --to-stdout --quiet scripts/4-fstab-fallback 2>/dev/null | grep -c echo)"
 
 # --- Installer (Calamares) patch ------------------------------------------------
 
@@ -523,7 +528,9 @@ echo old >"$part/android-x/otto/init-hooks.sh"
 echo app >"$part/android-x/otto/user_app/org.fdroid.fdroid.apk"
 echo new >"$TMP/upd/new/scripts/9-otto"
 echo new >"$TMP/upd/new/otto/init-hooks.sh"
-tar -C "$TMP/upd/new" -cf "$TMP/upd/update.tar" scripts otto
+echo old-initrd >"$part/android-x/initrd_a.img"
+echo new-initrd >"$TMP/upd/new/initrd.img"
+tar -C "$TMP/upd/new" -cf "$TMP/upd/update.tar" scripts otto initrd.img
 printf '#!/bin/sh\necho 0\n' >"$TMP/upd/bin/id"
 printf '#!/bin/sh\necho "/dev/block/sda1: UUID=\\"abcd-1234\\" TYPE=\\"ext4\\""\n' >"$TMP/upd/bin/blkid"
 # "mounting" points the mount folder at the fake partition
@@ -532,7 +539,7 @@ printf '#!/bin/sh\nfor last; do :; done\nrmdir "$last" && ln -s "%s" "$last"\n' 
 printf '#!/bin/sh\n:\n' >"$TMP/upd/bin/umount"
 chmod +x "$TMP/upd/bin"/*
 touch "$TMP/upd/sda1"
-echo "BOOT_IMAGE=/android-x/kernel quiet ROOT=UUID=abcd-1234 SRC=/android-x" >"$TMP/upd/cmdline"
+echo "BOOT_IMAGE=/android-x/kernel_a quiet ROOT=UUID=abcd-1234 SRC=/android-x androidboot.slot_suffix=_a" >"$TMP/upd/cmdline"
 sed "s#/dev/\*) dev=\$root ;;#/dev/*) dev=\$root ;;#; s#\[ -e \"\$dev\" \]#[ -n \"\$dev\" ]#" \
 	"$ROOT/tools/device/update.sh" >"$TMP/upd/update.sh"
 out=$(PATH="$TMP/upd/bin:$PATH" OTTO_CMDLINE="$TMP/upd/cmdline" OTTO_MNT="$TMP/upd/mnt" \
@@ -540,6 +547,8 @@ out=$(PATH="$TMP/upd/bin:$PATH" OTTO_CMDLINE="$TMP/upd/cmdline" OTTO_MNT="$TMP/u
 expect "update: installed files replaced, other hooks and installed apps kept" \
 	"new|theirs|new|app|old" \
 	"$(cat "$part/android-x/scripts/9-otto")|$(cat "$part/android-x/scripts/5-other")|$(cat "$part/android-x/otto/init-hooks.sh")|$(cat "$part/android-x/otto/user_app/org.fdroid.fdroid.apk")|$(cat "$part/android-x/otto.old/init-hooks.sh")"
+expect "update: the slot's initrd replaced, the old one kept" "new-initrd|old-initrd" \
+	"$(cat "$part/android-x/initrd_a.img")|$(cat "$part/android-x/initrd_a.img.old")"
 expect "update: says what it did" "Otto TV atualizado: ? -> ? (/dev/block/sda1/android-x)" \
 	"$(echo "$out" | head -n 1)"
 echo "androidboot.live=true ROOT=LABEL=x" >"$TMP/upd/cmdline"

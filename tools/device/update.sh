@@ -73,6 +73,17 @@ if ! mv "$new/otto" "$target/otto"; then
 	mv "$target/otto.old" "$target/otto"
 	fail "nao consegui trocar a pasta otto (a antiga foi mantida)"
 fi
+# The boot screen lives in the initrd. Installed systems boot initrd<slot>.img
+# (initrd_a.img), the one GRUB names; the previous one stays as .old.
+if [ -f "$new/initrd.img" ]; then
+	initrd="$target/initrd$(arg androidboot.slot_suffix).img"
+	[ -f "$initrd" ] || initrd="$target/initrd.img"
+	if [ -f "$initrd" ]; then
+		cp "$initrd" "$initrd.old" &&
+			cp "$new/initrd.img" "$initrd.new" &&
+			mv "$initrd.new" "$initrd" || fail "nao consegui trocar $initrd (o anterior esta em $initrd.old)"
+	fi
+fi
 rm -rf "$new"
 
 echo "Otto TV atualizado: $old_version -> $new_version ($dev$src)"

@@ -152,7 +152,7 @@ done
 mkdir -p "$OUT"
 UPDATE_TAR="$OUT/$ISO_BASENAME-$VERSION-update.tar"
 tar -C "$STAGE" --format=ustar --owner=0 --group=0 --exclude=otto/user_app \
-	-cf "$UPDATE_TAR" scripts otto
+	-cf "$UPDATE_TAR" scripts otto initrd.img
 log "Update archive: $UPDATE_TAR"
 if [ -n "${OTTO_UPDATE_ONLY:-}" ]; then
 	log "Done (OTTO_UPDATE_ONLY: no ISO)"
