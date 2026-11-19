@@ -10,26 +10,52 @@ My TV is old and weak. Its "smart" side takes forever to open anything,
 freezes in the middle of an episode, and using YouTube on it is a pain. At
 the same time I had an old Acer laptop sitting around with nothing to do.
 
-So I plugged the laptop into the TV and put Android TV on it. It worked,
-sort of: it took ages to boot, the sound came out of the wrong place, there
-was no remote, and half the screens expected a TV remote instead of a laptop.
-Otto TV is me fixing all of that, one thing at a time.
+So I plugged the laptop into the TV and put Android TV on it. It technically
+worked, but it was bad: it took ages to boot, the sound came out of the
+wrong place, there was no remote, and half the screens expected a TV remote
+instead of a laptop. Otto TV started as me fixing that, and it turned into a
+lot more.
 
-On my Acer (an old i5 with a hard drive) it now boots in about 40 seconds
-(it was 77) and the home screen runs smooth.
+### What you can do with it
 
-### What it does
+- **Watch stuff:** YouTube (the Android TV version), Stremio, and whatever
+  else you install.
+- **Play games with your phone as the controller.** Beach Buggy Racing runs
+  really well and it's a lot of fun.
+- **Install apps:** Aurora Store (the Play Store catalog, no Google account
+  needed) and F-Droid come with it.
+- **Browse the web** with DuckDuckGo, using the phone as keyboard and
+  touchpad.
+- **Use the laptop's keyboard and mouse** if you'd rather. The shortcuts
+  make sense on a TV: Esc goes back, F2 opens the quick panel.
 
-- Turns an old PC or laptop into an Android TV. Plug it into the TV over HDMI
-  and you're good.
-- Its own home screen: your favorites up top, every app one click away.
-- Your phone is the remote. Scan the QR code on the TV and that's it, no app
-  to install (iPhone and Android).
-- The sound goes to the TV on its own. Want the laptop speakers instead? One
-  click.
-- The laptop screen can go dark while you watch on the TV.
-- It updates itself: new versions show up in the quick panel (F2).
-- Comes with F-Droid, Aurora Store and DuckDuckGo.
+Netflix, Prime Video and the like are a different story: they only offer
+their apps to devices certified by Google, so they don't show up in Aurora.
+I'm working on it.
+
+### What's actually in here
+
+This isn't Android TV with a new wallpaper. Some of what went into it:
+
+- **A home screen written from scratch.** The app draws everything itself,
+  built to stay smooth on a laptop GPU from 2012: janky frames went from 30%
+  to 4%.
+- **A phone remote that works everywhere.** No app to install. The TV
+  creates a virtual keyboard and mouse, so Android thinks a USB keyboard is
+  plugged in. That's why it works in games, in settings, in any app. You pair
+  by scanning a QR code, and it finds the TV by name (`otto-tv.local`) even
+  when the router changes its address.
+- **Boots in 40 seconds on an old hard drive** (it was 77). After a boot it
+  notes what the system read, and on the next one it reads all of that in
+  disk order before Android asks for it.
+- **Apps you go back to open in 0.06 s** instead of 1.1 s.
+- **The sound just goes to the TV.** It reads the HDMI sensors to find the
+  output with a TV plugged in. Nothing to set up.
+- **It updates itself** from this repository's releases. Updates are signed,
+  so the TV only installs what I published.
+- **Its own installer, boot menu and boot animation**, with Otto the octopus.
+- **Tested.** Over 250 automated tests run on every change, and everything
+  above was measured on the real thing.
 
 ### What you need
 
@@ -42,8 +68,8 @@ On my Acer (an old i5 with a hard drive) it now boots in about 40 seconds
 ### How to try it
 
 There's no ISO to download yet: it's bigger than the 2 GB GitHub allows per
-file, and I'm still figuring out where to host it. For now you build it yourself
-([how](docs/technical.md#build)). Then:
+file, and I'm still figuring out where to host it. For now you build it
+yourself ([how](docs/technical.md#build)). Then:
 
 1. Write the ISO to a USB stick (Rufus, balenaEtcher or Ventoy).
 2. Plug the computer into the TV and boot from the stick.
@@ -75,25 +101,52 @@ abrir qualquer coisa, trava no meio do episódio, e usar o YouTube nela é um
 sofrimento. Ao mesmo tempo, eu tinha um notebook Acer antigo parado, sem uso
 nenhum.
 
-Aí liguei o notebook na TV e coloquei Android TV nele. Funcionou, mais ou
-menos: demorava muito pra ligar, o som saía no lugar errado, não tinha
-controle, e metade das telas esperava um controle remoto em vez de um
-notebook. O Otto TV sou eu arrumando tudo isso, uma coisa de cada vez.
+Aí liguei o notebook na TV e coloquei Android TV nele. Funcionar, funcionava,
+mas era ruim: demorava muito pra ligar, o som saía no lugar errado, não
+tinha controle, e metade das telas esperava um controle remoto em vez de um
+notebook. O Otto TV começou comigo arrumando isso, e virou bem mais que isso.
 
-No meu Acer (um i5 antigo com HD) ele liga em uns 40 segundos (antes eram
-77) e a tela inicial roda lisinha.
+### O que dá pra fazer com ele
 
-### O que ele faz
+- **Assistir:** YouTube (a versão de Android TV), Stremio e o que mais você
+  instalar.
+- **Jogar usando o celular como controle.** O Beach Buggy Racing roda muito
+  bem e é divertido demais.
+- **Instalar apps:** já vem com a Aurora Store (o catálogo da Play Store, sem
+  precisar de conta Google) e o F-Droid.
+- **Navegar na internet** com o DuckDuckGo, usando o celular como teclado e
+  touchpad.
+- **Usar o teclado e o mouse do notebook**, se preferir. Os atalhos fazem
+  sentido numa TV: Esc volta, F2 abre o painel rápido.
 
-- Transforma um PC ou notebook velho numa Android TV. Liga na TV pelo HDMI e
-  pronto.
-- Tela inicial própria: seus favoritos em cima, todos os apps a um clique.
-- O celular vira controle. Escaneia o QR code da TV e pronto, sem instalar
-  app nenhum (iPhone e Android).
-- O som vai pra TV sozinho. Prefere os alto-falantes do notebook? Um clique.
-- Dá pra apagar a tela do notebook enquanto você assiste na TV.
-- Ele se atualiza sozinho: as versões novas aparecem no painel rápido (F2).
-- Já vem com F-Droid, Aurora Store e DuckDuckGo.
+Netflix, Prime Video e parecidos são outra história: eles só liberam os apps
+pra aparelhos certificados pelo Google, então não aparecem na Aurora. Tô
+trabalhando nisso.
+
+### O que tem de verdade aqui dentro
+
+Não é um Android TV com papel de parede novo. Um pouco do que foi feito:
+
+- **Uma tela inicial feita do zero.** O próprio app desenha tudo, pensado pra
+  rodar liso numa placa de vídeo de notebook de 2012: os quadros travados
+  caíram de 30% pra 4%.
+- **Um controle no celular que funciona em tudo.** Sem instalar app. A TV
+  cria um teclado e um mouse virtuais, então o Android acha que tem um
+  teclado USB ligado. Por isso funciona em jogo, nas configurações, em
+  qualquer app. Você pareia escaneando um QR code, e ele acha a TV pelo nome
+  (`otto-tv.local`) mesmo quando o roteador muda o endereço dela.
+- **Liga em 40 segundos num HD velho** (antes eram 77). Depois de um boot ele
+  anota o que o sistema leu, e no próximo lê tudo isso na ordem em que está
+  no disco, antes de o Android pedir.
+- **Apps que você já abriu voltam em 0,06 s** em vez de 1,1 s.
+- **O som vai pra TV sozinho.** Ele lê os sensores do HDMI pra achar a saída
+  que tem uma TV ligada. Nada pra configurar.
+- **Ele se atualiza sozinho** pelas releases deste repositório. As
+  atualizações são assinadas, então a TV só instala o que eu publiquei.
+- **Instalador, menu de boot e animação de inicialização próprios**, com o
+  Otto, o polvo.
+- **Testado.** Mais de 250 testes automáticos rodam a cada mudança, e tudo aí
+  em cima foi medido no aparelho de verdade.
 
 ### O que você precisa
 
