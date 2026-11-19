@@ -283,6 +283,7 @@ if PRODUCT_NAME="Otto TV" VERSION="0.1.0" ISO_LABEL="OTTO_TV" \
 else
 	fail "grub: template renders" "render-grub.sh failed"
 fi
+# shellcheck disable=SC2016  # a literal $KERNEL_ARGS
 expect "grub: every entry finds the boot media by our label" "3" \
 	"$(grep -c '^\s*linux .*\$KERNEL_ARGS' "$TMP/grub.cfg")"
 expect "grub: the label is in the kernel arguments" "1" \
@@ -298,14 +299,14 @@ expect "grub: no upstream names left" "" \
 # The theme only names files and fonts that exist.
 theme="$ROOT/iso/boot/grub/themes/otto"
 missing=""
-for f in $(sed -n 's/^\s*file = "\(.*\)"/\1/p' "$theme/theme.txt"); do
+while read -r f; do
 	[ -f "$theme/$f" ] || missing="$missing $f"
-done
-for style in $(sed -n 's/^\s*\(item\|selected_item\)_pixmap_style = "\(.*\)\*\.png"/\2/p' "$theme/theme.txt"); do
+done < <(sed -n 's/^\s*file = "\(.*\)"/\1/p' "$theme/theme.txt")
+while read -r style; do
 	for part in nw n ne w c e sw s se; do
 		[ -f "$theme/$style$part.png" ] || missing="$missing $style$part.png"
 	done
-done
+done < <(sed -n 's/^\s*\(item\|selected_item\)_pixmap_style = "\(.*\)\*\.png"/\2/p' "$theme/theme.txt")
 expect "grub theme: every image exists" "" "$missing"
 fonts=$(for f in "$theme"/*.pf2; do strings "$f" | sed -n '/^PFF2NAME$/{n;p;q}'; done | sort -u | paste -sd'|')
 used=$(sed -n 's/.*font = "\(.*\)"/\1/p; s/^terminal-font: "\(.*\)"/\1/p' "$theme/theme.txt" | sort -u | paste -sd'|')
@@ -324,6 +325,7 @@ if dash -n "$TMP/init" 2>/dev/null || sh -n "$TMP/init"; then
 else
 	fail "initrd: patched /init is valid shell" "syntax error"
 fi
+# shellcheck disable=SC2016  # a literal $dev
 expect "initrd: no upstream logo or chatter left" "0" \
 	"$(grep -c -e '#\*\*\*' -e 'WARNING: NTFS' -e 'Detecting Android-x86' -e 'Scanning \$dev' -e 'console shell' "$TMP/init")"
 expect "initrd: the kernel command line isn't printed" "1" \
