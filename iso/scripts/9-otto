@@ -303,7 +303,7 @@ otto_patch_installer() {
 	if mkdir -p "$root/usr/local/bin" &&
 		cp "$inst/otto-restart" "$root/usr/local/bin/otto-restart" 2>/dev/null; then
 		chmod 755 "$root/usr/local/bin/otto-restart"
-		cp "$inst/otto-ascii.txt" "$root/etc/otto/otto-ascii.txt" 2>/dev/null
+		cp "$payload/otto-ascii.txt" "$root/etc/otto/otto-ascii.txt" 2>/dev/null
 		sed -i 's|^restartNowCommand: .*|restartNowCommand: "/usr/local/bin/otto-restart"|' \
 			"$cal/modules/finished.conf" 2>/dev/null
 	fi

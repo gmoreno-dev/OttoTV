@@ -86,8 +86,9 @@ mkdir -p "$STAGE/otto/installer"
 cp -r "$ROOT/iso/boot/grub/themes/otto" "$STAGE/otto/installer/grub-theme"
 # Installed menus have 3 items at most (no "Install"): the hints go up a row.
 sed -i 's/top = 44%+236/top = 44%+184/' "$STAGE/otto/installer/grub-theme/theme.txt"
-# Otto in text, for the installer's last screen (otto-restart).
-cp "$ROOT/art/brand/otto-ascii.txt" "$STAGE/otto/installer/otto-ascii.txt"
+# Otto in text, for Android to redraw (init-hooks.sh) and for the
+# installer's last screen (otto-restart).
+cp "$ROOT/art/brand/otto-ascii.txt" "$STAGE/otto/otto-ascii.txt"
 
 # The initrd: upstream's, with a quiet boot screen showing Otto (see
 # tools/patch-initrd.sh). Installed systems get it from the installer.

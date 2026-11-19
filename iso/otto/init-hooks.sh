@@ -226,8 +226,54 @@ otto_setup_mirror() {
 	setprop "$OTTO_MIRROR_PROP" "$v"
 }
 
+# Otto in text again, centered, now that Android's graphics driver has the
+# screen. The initrd drew it on the firmware's framebuffer. When the driver
+# (i915...) replaces that, the console spends a moment on the 80x25 dummy
+# console and keeps only that corner of the drawing: the head and the right
+# half were gone until the boot animation. post_init runs after upstream's
+# init_hal_gralloc, which waits for that driver.
+otto_console_art() {
+	local art="${OTTO_ART:-/boot/otto/otto-ascii.txt}" tty="${OTTO_CONSOLE:-/dev/tty0}"
+	local size rows cols fb pad top spaces line
+	[ -f "$art" ] && [ -w "$tty" ] || return 0
+	size=$(stty -F "$tty" size 2>/dev/null)
+	rows=${size% *}
+	cols=${size#* }
+	case "$size" in
+	[0-9]*" "[0-9]*) ;;
+	*)
+		# The framebuffer, in the console's 8x16 font.
+		fb=$(cat "${OTTO_FB_SIZE:-/sys/class/graphics/fb0/virtual_size}" 2>/dev/null)
+		case "$fb" in
+		[0-9]*,[0-9]*)
+			cols=$((${fb%,*} / 8))
+			rows=$((${fb#*,} / 16))
+			;;
+		*) return 0 ;;
+		esac
+		;;
+	esac
+	pad=$(((cols - 76) / 2))
+	top=$(((rows - 20) / 2))
+	[ "$pad" -ge 0 ] || pad=0
+	[ "$top" -ge 0 ] || top=0
+	spaces=$(printf "%${pad}s" "")
+	{
+		# clear, cursor home, cursor hidden
+		printf '\033[2J\033[H\033[?25l'
+		while [ "$top" -gt 0 ]; do
+			echo
+			top=$((top - 1))
+		done
+		while IFS= read -r line; do
+			echo "$spaces$line"
+		done <"$art"
+	} >"$tty" 2>/dev/null
+}
+
 post_init() {
 	otto_log "post_init"
+	otto_console_art
 	# Persistent props load later and win, so a language the user picked stays.
 	set_prop_if_empty persist.sys.locale "${OTTO_LOCALE:-pt-BR}"
 	otto_setup_mirror

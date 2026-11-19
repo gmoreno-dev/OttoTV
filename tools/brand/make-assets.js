@@ -102,7 +102,10 @@ async function bootAnimation(browser) {
     await page.locator('#a').screenshot({ path: path.join(part, String(n).padStart(5, '0') + '.png') });
     await page.close();
   }
-  fs.writeFileSync(path.join(tmp, 'desc.txt'), '640 640 ' + G.BOOT_FPS + '\np 0 0 part0 0 #161B22\n');
+  // TYPE COUNT PAUSE PATH #RGBHEX: the color fills the rest of the screen.
+  // (A FADE count before the color is for "f" parts only: in 0.4.2 it made
+  // Android skip the color, and the square showed on black.)
+  fs.writeFileSync(path.join(tmp, 'desc.txt'), '640 640 ' + G.BOOT_FPS + '\np 0 0 part0 #161B22\n');
   const out = path.join(ROOT, 'iso/otto/bootanimation.zip');
   fs.rmSync(out, { force: true });
   // Android reads the frames in place: the zip must be stored, not deflated.

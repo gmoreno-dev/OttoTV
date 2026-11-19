@@ -72,6 +72,10 @@ expect "hdmi: finds the TV on the second sound card" "pcmC1D3p" \
 
 # --- post_init end to end, with Android's commands mocked ---------------------
 
+# The console Otto is drawn on, and the drawing.
+export OTTO_CONSOLE="$TMP/console" OTTO_ART="$ROOT/art/brand/otto-ascii.txt"
+: >"$OTTO_CONSOLE"
+
 # shellcheck disable=SC2329  # mocks, called by the hooks under test
 {
 	setprop() { echo "setprop $1 $2" >>"$TMP/props"; }
@@ -97,6 +101,15 @@ OTTO_MIRROR=ask otto_setup_mirror
 expect "mirror: OTTO_MIRROR=ask brings back Android's question" \
 	"setprop persist.sys.display.enable_on_connect.external false" "$(cat "$TMP/props")"
 unset -f alsa_amixer setprop getprop set_prop_if_empty log setsid
+
+# Otto redrawn once the GPU driver has the screen: 1366x768 in 8x16, as the
+# initrd centers it.
+echo 1366,768 >"$TMP/fb_size"
+: >"$OTTO_CONSOLE"
+OTTO_FB_SIZE="$TMP/fb_size" otto_console_art
+expect "console: Otto redrawn 14 lines down, 47 spaces in" \
+	"14|$(printf '%47s%s' '' "$(head -n 1 "$OTTO_ART")")" \
+	"$(sed 's/^\x1b\[2J\x1b\[H\x1b\[?25l//' "$OTTO_CONSOLE" | awk 'NF { print NR - 1; exit }')|$(sed 's/^\x1b\[2J\x1b\[H\x1b\[?25l//' "$OTTO_CONSOLE" | awk 'NF' | head -n 1)"
 
 # --- On-screen keyboard ---------------------------------------------------------
 
@@ -384,7 +397,7 @@ echo bliss >"$inst/usr/share/backgrounds/blissified_09.png"
 payload="$TMP/payload"
 cp -r "$ROOT/iso/otto" "$payload"
 cp -r "$ROOT/iso/boot/grub/themes/otto" "$payload/installer/grub-theme"
-cp "$ROOT/art/brand/otto-ascii.txt" "$payload/installer/otto-ascii.txt"
+cp "$ROOT/art/brand/otto-ascii.txt" "$payload/otto-ascii.txt"
 cal="$inst/etc/calamares"
 mods="$inst/usr/lib/x86_64-linux-gnu/calamares/modules"
 
@@ -568,7 +581,7 @@ touch "$TMP/anim/android/system/product/media/bootanimation.zip" \
 expect "boot animation: Otto over both of upstream's" \
 	"mount --bind /mnt/../$TMP/anim/mnt/live/otto/bootanimation.zip $TMP/anim/android/system/product/media/bootanimation.zip|mount --bind /mnt/../$TMP/anim/mnt/live/otto/bootanimation.zip $TMP/anim/android/system/product/media/bootanimation-dark.zip" \
 	"$(paste -sd'|' "$TMP/calls")"
-expect "boot animation: stored zip with Android's desc.txt" "640 640 24|p 0 0 part0 0 #161B22|36" \
+expect "boot animation: stored zip with Android's desc.txt" "640 640 24|p 0 0 part0 #161B22|36" \
 	"$(unzip -p "$ROOT/iso/otto/bootanimation.zip" desc.txt | paste -sd'|')|$(unzip -l "$ROOT/iso/otto/bootanimation.zip" | grep -c 'part0/[0-9]*\.png')"
 expect "boot animation: frames are stored, not deflated" "0" \
 	"$(unzip -v "$ROOT/iso/otto/bootanimation.zip" | grep -c Defl)"
