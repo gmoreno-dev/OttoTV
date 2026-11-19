@@ -399,6 +399,39 @@ otto_boot_animation() {
 	otto_msg "boot animation: ${zip##*/}"
 }
 
+# Boots from a hard disk spend most of their time waiting for the disk:
+# Android reads a few hundred MB of the system image and of /data in a
+# scattered order, a seek each time. otto-remote's prefetcher reads what
+# the last boot read, in file order and long reads, before Android asks
+# for it, then exits; with no list yet it waits for the boot to finish and
+# notes what it read (remote/prefetch). It keeps running after
+# switch_root: from the initrd's root it still sees the partition at /mnt.
+# Disk read-ahead goes up for the boot too (init-hooks.sh puts it back).
+# Only installed systems (the list is kept next to our files); live ones
+# boot from a stick. OTTO_PREFETCH=off turns it off.
+otto_prefetch() {
+	local dir="/mnt/$SRC" img q bin="${OTTO_TMP:-/tmp}/otto-prefetch"
+	local sys="${OTTO_SYSFS:-/sys}"
+	[ "${OTTO_PREFETCH:-on}" = on ] || return 0
+	[ -w "$dir/otto" ] && [ -f "$dir/otto/remote/otto-remote" ] || return 0
+	# A first boot installs apps and compiles: nothing like the boots after it.
+	otto_first_boot && return 0
+	img=$(cat "$sys/block/loop0/loop/backing_file" 2>/dev/null)
+	[ -f "$img" ] || return 0
+	for q in "$sys"/block/sd*/queue "$sys/block/loop0/queue"; do
+		[ -w "$q/read_ahead_kb" ] && echo 2048 >"$q/read_ahead_kb"
+	done
+	# A copy in RAM: the partition may be mounted noexec.
+	cp "$dir/otto/remote/otto-remote" "$bin" && chmod 755 "$bin" || return 0
+	(
+		cd /
+		exec "$bin" prefetch -list "$dir/otto/prefetch.list" "$img" "$dir/data.img" \
+			"$dir/data/dalvik-cache" "$dir/data/misc/apexdata" "$dir/data/app" \
+			"$dir/data/system" "$dir/data/system_de" "$dir/data/user_de"
+	) </dev/null >/dev/null 2>&1 &
+	otto_msg "prefetch: started ($(basename "$img"))"
+}
+
 post_detect() {
 	# Recovery never starts our Android: leave it alone.
 	[ "$RCVRY" ] && return 0
@@ -418,6 +451,7 @@ post_detect() {
 	otto_keylayouts
 	otto_expose_runtime
 	otto_hide_upstream_apps
+	otto_prefetch
 }
 
 # Install mode, before upstream mounts the installer (otto_installer_to_ram).

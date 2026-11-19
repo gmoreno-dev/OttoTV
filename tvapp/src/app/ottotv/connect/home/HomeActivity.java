@@ -237,7 +237,8 @@ public class HomeActivity extends Activity implements AppMenu.Listener {
 
     private void build() {
         FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(Ui.BG);
+        // No background under the backdrop, which covers the whole screen:
+        // every full-screen fill is one more the GPU repeats on each frame.
         root.setClipChildren(false);
         backdrop = new Backdrop(this, ui);
         root.addView(backdrop, new FrameLayout.LayoutParams(-1, -1));
@@ -268,6 +269,7 @@ public class HomeActivity extends Activity implements AppMenu.Listener {
         place(stage, toast, 1204, 130, ToastView.WIDTH, -2);
 
         setContentView(root);
+        getWindow().setBackgroundDrawable(null);
     }
 
     private FrameLayout layer(FrameLayout stage) {

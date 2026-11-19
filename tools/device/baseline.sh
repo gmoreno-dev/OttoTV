@@ -340,6 +340,7 @@ SUMMARY=/data/local/tmp/otto-summary.tmp
 	echo "Armazenamento: midia de boot $raw_mbs MB/s, imagem do sistema $sys_mbs MB/s, /data $data_mbs MB/s"
 	echo "Rede: roteador ${lan_ms:-?} ms, internet ${wan_ms:-?} ms (${loss:-perda ?} pra internet)"
 	echo "Temperatura: $temps"
+	echo "Pre-leitura do boot: $(tr '\n' ' ' </boot/otto/prefetch.log 2>/dev/null | sed 's/prefetch: //g')"
 } >"$SUMMARY"
 cat "$SUMMARY"
 cat "$SUMMARY" >&3

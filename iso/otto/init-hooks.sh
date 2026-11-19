@@ -267,6 +267,29 @@ otto_setup_home() {
 	fi
 }
 
+# ---- Apps compiled ahead of time ------------------------------------------------
+# Apps from a store are only verified when installed, so their first opens
+# run interpreted code on an old CPU (DuckDuckGo took 10 to 37 s on the
+# Acer). Once the boot has settled, each is compiled ahead of time
+# ("speed"), and so is our own app, the home screen. ART skips what is
+# already compiled that way, so later boots only compile what is new.
+# OTTO_COMPILE=off turns it off.
+otto_precompile() {
+	[ "${OTTO_COMPILE:-on}" = on ] || return 0
+	# In the detached shell, $0 is the delay and $1 our app.
+	# shellcheck disable=SC2016  # expanded by the detached shell
+	otto_detach '
+		sleep "$0"
+		for p in "$1" $(pm list packages -3 2>/dev/null | sed "s/^package://"); do
+			out=$(cmd package compile -m speed "$p" 2>&1)
+			case "$out" in
+			*Success*) log -t otto "compile: $p" ;;
+			*) log -t otto "compile: $p: $out" ;;
+			esac
+		done
+	' "${OTTO_COMPILE_DELAY:-180}" "${OTTO_HOME_APP%%/*}"
+}
+
 # Android 14 keeps a TV dark until someone answers "Mirror to display?", and
 # asks on the laptop's own screen: nobody sees that when the laptop screen is
 # dark or its lid is closed. Userdebug builds (this one) can skip the question.
@@ -420,14 +443,27 @@ otto_bootcomplete_early() {
 	otto_start_remote && remote=1
 	otto_wait_for_apps
 	otto_setup_home
+	otto_precompile
 	otto_setup_ime
 	[ -z "$remote" ] || otto_offer_pairing
 	# "Almost ready" can go (otto_show_preparing).
 	setprop "$OTTO_READY_PROP" 1
 }
 
+# The initrd raised disk read-ahead for the boot (otto_prefetch in 9-otto):
+# large reads suit a hard disk reading the system image start to end, not
+# apps reading here and there. 512 KB from now on.
+otto_restore_readahead() {
+	local q sys="${OTTO_SYSFS:-/sys}"
+	for q in "$sys"/block/sd*/queue "$sys/block/loop0/queue"; do
+		[ "$(cat "$q/read_ahead_kb" 2>/dev/null)" = 2048 ] && echo 512 >"$q/read_ahead_kb"
+	done 2>/dev/null
+	return 0
+}
+
 post_bootcomplete() {
 	otto_log "post_bootcomplete"
+	otto_restore_readahead
 	# Only if upstream's init.sh changed shape and the early call is missing.
 	[ -n "${OTTO_EARLY_DONE:-}" ] || otto_bootcomplete_early
 	# The TV may have been off or still waking up during early boot.

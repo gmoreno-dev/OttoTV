@@ -24,6 +24,7 @@ import (
 
 	"otto/remote/hotkeys"
 	"otto/remote/panel"
+	"otto/remote/prefetch"
 	"otto/remote/server"
 	"otto/remote/system"
 	"otto/remote/uinput"
@@ -50,6 +51,10 @@ func notify(app, kind, pkg string) {
 }
 
 func main() {
+	// The initrd starts us as the boot prefetcher too (iso/scripts/9-otto).
+	if len(os.Args) > 1 && os.Args[1] == "prefetch" {
+		os.Exit(prefetch.Main(os.Args[2:]))
+	}
 	port := flag.Int("port", 8686, "HTTP port")
 	state := flag.String("state", "/data/misc/otto", "folder for the pairing token")
 	uinputPath := flag.String("uinput", "/dev/uinput", "uinput device")

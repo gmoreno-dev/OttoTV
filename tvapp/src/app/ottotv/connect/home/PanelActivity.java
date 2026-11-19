@@ -210,7 +210,9 @@ public class PanelActivity extends Activity {
         PanelItem first = "power".equals(startOn) ? power : laptop ? sound : wifi;
         focus = -1;
         focus(first);
-        box.animate().alpha(1).translationX(0).setDuration(Ui.SLOW).setInterpolator(new DecelerateInterpolator()).start();
+        // withLayer: the panel is drawn once and slid as an image, not redrawn per frame.
+        box.animate().alpha(1).translationX(0).setDuration(Ui.SLOW).setInterpolator(new DecelerateInterpolator())
+                .withLayer().start();
         if (detailsShown) {
             showDetails(true);
         }
@@ -564,7 +566,7 @@ public class PanelActivity extends Activity {
         more.titleText = getString(show ? R.string.panel_hide_details : R.string.panel_show_details);
         more.on = show;
         more.update(true);
-        details.animate().alpha(show ? 1 : 0).translationX(show ? 0 : ui.f(32)).setDuration(Ui.SLOW)
+        details.animate().alpha(show ? 1 : 0).translationX(show ? 0 : ui.f(32)).setDuration(Ui.SLOW).withLayer()
                 .setInterpolator(new DecelerateInterpolator()).start();
         if (show) {
             fillDetails(null);
@@ -631,8 +633,8 @@ public class PanelActivity extends Activity {
             return;
         }
         closing = true;
-        box.animate().alpha(0).translationX(ui.f(48)).setDuration(Ui.SLOW).start();
-        details.animate().alpha(0).setDuration(Ui.SLOW).start();
+        box.animate().alpha(0).translationX(ui.f(48)).setDuration(Ui.SLOW).withLayer().start();
+        details.animate().alpha(0).setDuration(Ui.SLOW).withLayer().start();
         veil.animate().alpha(0).setDuration(180).withEndAction(() -> {
             finish();
             overridePendingTransition(0, 0);

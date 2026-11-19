@@ -331,6 +331,7 @@ unset -f settings log
 	otto_start_remote() { echo remote >>"$TMP/calls"; [ -z "${REMOTE_FAILS:-}" ]; }
 	otto_wait_for_apps() { echo wait >>"$TMP/calls"; }
 	otto_setup_home() { echo home >>"$TMP/calls"; }
+	otto_precompile() { echo compile >>"$TMP/calls"; }
 	otto_offer_pairing() { echo pairing >>"$TMP/calls"; }
 	setprop() { echo "$1=$2" >>"$TMP/calls"; }
 	getprop() { echo pcmC0D3p; }
@@ -339,15 +340,15 @@ unset -f settings log
 : >"$TMP/calls"
 (otto_bootcomplete_early && post_bootcomplete)
 expect "bootcomplete: early call does the work, post_bootcomplete doesn't repeat it" \
-	"mirror|setup|remote|wait|home|ime|pairing|otto.boot.ready=1" "$(paste -sd'|' "$TMP/calls")"
+	"mirror|setup|remote|wait|home|compile|ime|pairing|otto.boot.ready=1" "$(paste -sd'|' "$TMP/calls")"
 : >"$TMP/calls"
 (post_bootcomplete)
 expect "bootcomplete: post_bootcomplete steps in without the early call" \
-	"mirror|setup|remote|wait|home|ime|pairing|otto.boot.ready=1" "$(paste -sd'|' "$TMP/calls")"
+	"mirror|setup|remote|wait|home|compile|ime|pairing|otto.boot.ready=1" "$(paste -sd'|' "$TMP/calls")"
 : >"$TMP/calls"
 (REMOTE_FAILS=1 otto_bootcomplete_early)
 expect "bootcomplete: no pairing screen when the remote didn't start" \
-	"mirror|setup|remote|wait|home|ime|otto.boot.ready=1" "$(paste -sd'|' "$TMP/calls")"
+	"mirror|setup|remote|wait|home|compile|ime|otto.boot.ready=1" "$(paste -sd'|' "$TMP/calls")"
 
 # The TV woke up late: boot complete routes the sound and restarts
 # audioserver, unless the quick panel chose the laptop.
@@ -372,7 +373,7 @@ echo notebook >"$OTTO_STATE/audio"
 expect "bootcomplete: ...but not when the sound was sent to the laptop" \
 	"otto.audio.hdmi=pcmC1D3p|hal.audio.out.hdmi=pcmC1D3p|hal.audio.primary.hdmi=0" "$(paste -sd'|' "$TMP/calls")"
 rm -f "$OTTO_STATE/audio"
-unset -f otto_setup_mirror otto_setup_ime otto_start_remote otto_wait_for_apps otto_setup_home otto_offer_pairing setprop getprop pkill log alsa_amixer
+unset -f otto_setup_mirror otto_setup_ime otto_start_remote otto_wait_for_apps otto_setup_home otto_precompile otto_offer_pairing setprop getprop pkill log alsa_amixer
 # shellcheck source=iso/otto/init-hooks.sh
 source "$ROOT/iso/otto/init-hooks.sh"
 
@@ -927,6 +928,74 @@ unset -f mknod mount
 
 expect "keys: Esc with key flags still becomes Back" "key 1   BACK" \
 	"$(echo 'key 1   ESCAPE  VIRTUAL' | otto_esc_to_back)"
+
+# Apps compiled ahead of time, once the boot settles: our app first, then
+# the ones the user installed.
+# shellcheck disable=SC2329  # mocks, called by the compile job
+{
+	otto_detach() { bash -c "$1" "${@:2}"; }
+	sleep() { :; }
+	pm() { printf 'package:com.stremio.one\npackage:com.duckduckgo.mobile.android\n'; }
+	cmd() {
+		echo "cmd $*" >>"$TMP/calls"
+		[ "$5" = com.stremio.one ] && { echo "Failure: no space"; return 1; }
+		echo Success
+	}
+	log() { echo "log $3" >>"$TMP/calls"; }
+	export -f pm cmd log sleep
+}
+: >"$TMP/calls"
+otto_precompile
+expect "compile: our app and the installed ones, failures logged" \
+	"cmd package compile -m speed app.ottotv.connect|log compile: app.ottotv.connect|cmd package compile -m speed com.stremio.one|log compile: com.stremio.one: Failure: no space|cmd package compile -m speed com.duckduckgo.mobile.android|log compile: com.duckduckgo.mobile.android" \
+	"$(paste -sd'|' "$TMP/calls")"
+: >"$TMP/calls"
+OTTO_COMPILE=off otto_precompile
+expect "compile: OTTO_COMPILE=off" "" "$(cat "$TMP/calls")"
+unset -f otto_detach sleep pm cmd log
+# shellcheck source=iso/otto/init-hooks.sh
+source "$ROOT/iso/otto/init-hooks.sh"
+
+# --- Boot prefetch (initrd hook) ---------------------------------------------------
+
+# 9-otto again: init-hooks.sh has an otto_first_boot of its own, for Android.
+# shellcheck source=iso/scripts/9-otto
+source "$ROOT/iso/scripts/9-otto"
+
+pf="$TMP/pf"
+mkdir -p "$pf/otto/remote" "$pf/data/vendor" "$TMP/sysfs/block/loop0/loop" "$TMP/sysfs/block/loop0/queue" \
+	"$TMP/sysfs/block/sda/queue" "$TMP/pftmp"
+touch "$pf/data/vendor/post_inst_complete" "$pf/system_a.img"
+echo "$pf/system_a.img" >"$TMP/sysfs/block/loop0/loop/backing_file"
+for q in sda loop0; do echo 128 >"$TMP/sysfs/block/$q/queue/read_ahead_kb"; done
+cat >"$pf/otto/remote/otto-remote" <<'EOF'
+#!/bin/sh
+echo "$@" >"$(dirname "$0")/prefetch-args"
+EOF
+prefetch() {
+	rm -f "$TMP/pftmp/prefetch-args"
+	SRC=../$pf OTTO_DATA="$pf/data" OTTO_SYSFS="$TMP/sysfs" OTTO_TMP="$TMP/pftmp" otto_prefetch
+	wait
+}
+prefetch
+expect "prefetch: started with the system image and /data, read-ahead up for the boot" \
+	"prefetch -list /mnt/../$pf/otto/prefetch.list $pf/system_a.img /mnt/../$pf/data.img /mnt/../$pf/data/dalvik-cache /mnt/../$pf/data/misc/apexdata /mnt/../$pf/data/app /mnt/../$pf/data/system /mnt/../$pf/data/system_de /mnt/../$pf/data/user_de|2048|2048" \
+	"$(cat "$TMP/pftmp/prefetch-args" 2>/dev/null)|$(cat "$TMP/sysfs/block/sda/queue/read_ahead_kb")|$(cat "$TMP/sysfs/block/loop0/queue/read_ahead_kb")"
+rm "$pf/data/vendor/post_inst_complete"
+prefetch
+expect "prefetch: not on a first boot" "" "$(cat "$TMP/pftmp/prefetch-args" 2>/dev/null)"
+touch "$pf/data/vendor/post_inst_complete"
+OTTO_PREFETCH=off prefetch
+expect "prefetch: OTTO_PREFETCH=off" "" "$(cat "$TMP/pftmp/prefetch-args" 2>/dev/null)"
+echo "$pf/nothing.img" >"$TMP/sysfs/block/loop0/loop/backing_file"
+prefetch
+expect "prefetch: no system image, nothing to do" "" "$(cat "$TMP/pftmp/prefetch-args" 2>/dev/null)"
+# Boot complete puts read-ahead back, only where the initrd raised it.
+echo 2048 >"$TMP/sysfs/block/sda/queue/read_ahead_kb"
+echo 256 >"$TMP/sysfs/block/loop0/queue/read_ahead_kb"
+OTTO_SYSFS="$TMP/sysfs" otto_restore_readahead
+expect "prefetch: read-ahead back to 512 KB after the boot" "512|256" \
+	"$(cat "$TMP/sysfs/block/sda/queue/read_ahead_kb")|$(cat "$TMP/sysfs/block/loop0/queue/read_ahead_kb")"
 
 # --- Python parts -----------------------------------------------------------------
 

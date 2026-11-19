@@ -4,7 +4,7 @@ Turn an old PC or laptop into a fast, plug-and-play Android TV for any TV.
 Flash a USB stick, plug the computer into the TV over HDMI, try it live, then
 install it.
 
-> Status: **v0.5.1, early development.** Tested on one machine so far:
+> Status: **v0.6.0, early development.** Tested on one machine so far:
 > [Acer HM77 / Ivy Bridge](docs/hardware/acer-hm77-ivybridge.md).
 
 **What it needs:** a 64-bit PC with SSE4.2 (Android 14 requires it: Intel
@@ -36,8 +36,9 @@ USB stick
  │      │    │  (on a first boot, one that says it takes minutes)
  │      │    ├─ bind-mounts /otto on /boot/otto (Android only sees
  │      │    │  the media's /boot folder, so that's where it finds us)
- │      │    └─ hides upstream's setup wizard, updater and home screen
- │      │       (whiteouts; Otto TV has its own)
+ │      │    ├─ hides upstream's setup wizard, updater and home screen
+ │      │    │  (whiteouts; Otto TV has its own)
+ │      │    └─ starts the boot prefetcher (installed systems)
  │      └─ install mode: makes Calamares Otto TV's installer
  │           ├─ runs it from RAM (the stick can come out any time after)
  │           ├─ 4 steps, Otto's branding, Portuguese, GRUB without asking
@@ -52,6 +53,7 @@ USB stick
         ├─ finds the HDMI output with a TV attached and routes audio to it
         │  (unless the quick panel sent the sound to the laptop)
         ├─ makes Otto TV's launcher the home screen, with its permissions
+        ├─ compiles installed apps ahead of time, once the boot settles
         ├─ picks the on-screen keyboard (none with a physical keyboard)
         └─ starts otto-remote, the phone remote   ← ours: remote/ (Go)
 ```
@@ -141,6 +143,19 @@ moving to a new upstream release is mostly bumping the ISO hash.
   an HDMI screen dark until someone answers "Mirror to display?", asked on
   the laptop's own screen (unseen with that screen dark or the lid closed).
   Otto TV skips the question; `OTTO_MIRROR=ask` brings it back.
+- **Faster boots from a hard disk.** On the Acer, the boot spent most of its
+  time waiting for the disk: Android reads a few hundred MB in a scattered
+  order, one seek each time. After a boot, Otto TV notes which parts of the
+  system image and `/data` it read (in the order they sit on the disk);
+  on the next boot the initrd reads them in long sequential reads before
+  Android asks, with a larger read-ahead while the boot lasts. The list is
+  made again every three weeks; `OTTO_PREFETCH=off` turns it off.
+  Installed apps are compiled ahead of time once the boot settles, so their
+  first opens don't run interpreted code (`OTTO_COMPILE=off`).
+- **A home screen light on old GPUs.** Its backdrop is drawn once per color
+  into a GPU layer, and shadows and the focus glow are blurred once into
+  masks: frames copy them instead of computing five full-screen gradients
+  and blurs each time.
 - **Compressed memory (zram) that actually turns on.** Upstream's zram
   script dies on the `BOOT_IMAGE=(hd96)/kernel` GRUB adds to the command
   line, so no machine got it. Otto TV fixes the script at boot; it matters
@@ -222,6 +237,8 @@ in Android's `init.sh`, which both upstream and our hooks read.
 | `OTTO_REMOTE`     | `on`                | `off` doesn't start the phone remote (nor the keyboard shortcuts) |
 | `OTTO_SETUP`      | `ours`              | `wizard` keeps upstream's setup wizard |
 | `OTTO_LAUNCHER`   | `ours`              | `upstream` keeps upstream's home screen (and leaves the home screen choice alone) |
+| `OTTO_PREFETCH`   | `on`                | `off` doesn't read ahead what the boot needs |
+| `OTTO_COMPILE`    | `on`                | `off` doesn't compile installed apps ahead of time |
 | `SET_TZ_LOCATION` | `America/Sao_Paulo` | Time zone (upstream option) |
 
 To try one without rebuilding, press `e` on a menu entry, append it to the
