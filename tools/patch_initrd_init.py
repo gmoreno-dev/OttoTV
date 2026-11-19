@@ -19,15 +19,28 @@ import re
 import sys
 
 TEXT_ART = '''# Otto TV: Otto in text mode, centered on the console, until the boot
-# animation takes over the screen. (Replaced by Otto TV's build.)
+# animation takes over the screen. On a first boot, which takes minutes, two
+# lines under him say so. (Replaced by Otto TV's build.)
 text_art() {
-	local size rows cols pad top spaces line
+	local size rows cols pad top spaces line data first=""
 	clear
+	# A first boot: Android's data has no post_inst_complete yet (upstream
+	# writes it once its bundled apps are installed), or a live system, which
+	# starts from scratch every time. Not the installer.
+	data="${OTTO_DATA:-/mnt/${SRC:-}/data}"
+	if [ -z "${INSTALL:-}" ]; then
+		if [ -d "$data" ]; then
+			[ -e "$data/vendor/post_inst_complete" ] || first=1
+		elif grep -q androidboot.live=true "${OTTO_CMDLINE:-/proc/cmdline}"; then
+			first=1
+		fi
+	fi
 	size=$(stty size 2>/dev/null)
 	rows=${size% *}
 	cols=${size#* }
 	pad=$(( (${cols:-80} - 76) / 2 ))
 	top=$(( (${rows:-25} - 20) / 2 ))
+	[ -z "$first" ] || top=$((top - 2))
 	[ "$pad" -ge 0 ] || pad=0
 	[ "$top" -ge 0 ] || top=0
 	while [ "$top" -gt 0 ]; do
@@ -38,6 +51,14 @@ text_art() {
 	while IFS= read -r line; do
 		echo "$spaces$line"
 	done <"${OTTO_ART:-/otto-ascii.txt}"
+	[ -n "$first" ] || return 0
+	echo
+	for line in "Preparando o Otto TV pela primeira vez." "Isso leva alguns minutos."; do
+		pad=$(( (${cols:-80} - ${#line}) / 2 ))
+		[ "$pad" -ge 0 ] || pad=0
+		spaces=$(printf "%${pad}s" "")
+		echo "$spaces$line"
+	done
 }
 '''
 

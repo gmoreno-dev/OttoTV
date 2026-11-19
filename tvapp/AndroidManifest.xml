@@ -2,6 +2,8 @@
 <!-- Otto TV's own app:
      - "Connect phone": a thin full-screen shell around the pairing screen
        that otto-remote serves on the TV itself (see remote/web/tv.html).
+     - "Almost ready": what a first boot shows while the home screen would
+       still be empty (PreparingActivity).
      - "Physical keyboard": an invisible keyboard for when one is plugged in,
        where Enter does what the TV keyboard's "›" button does. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -30,6 +32,17 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Started by init-hooks.sh, possibly before Android unlocks the
+             user: directBootAware. -->
+        <activity
+            android:name=".PreparingActivity"
+            android:exported="true"
+            android:directBootAware="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:screenOrientation="landscape"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout" />
 
         <service
             android:name=".KeyboardService"

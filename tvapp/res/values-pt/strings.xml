@@ -2,4 +2,6 @@
 <resources>
     <string name="app_name">Conectar celular</string>
     <string name="keyboard_name">Teclado físico</string>
+    <string name="preparing_title">Quase pronto</string>
+    <string name="preparing_text">Preparando os apps pela primeira vez. Isso leva alguns minutos.</string>
 </resources>

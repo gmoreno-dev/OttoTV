@@ -2,4 +2,6 @@
 <resources>
     <string name="app_name">Connect phone</string>
     <string name="keyboard_name">Physical keyboard</string>
+    <string name="preparing_title">Almost ready</string>
+    <string name="preparing_text">Setting up the apps for the first time. This takes a few minutes.</string>
 </resources>

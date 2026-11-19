@@ -232,6 +232,7 @@ otto_setup_mirror() {
 # console and keeps only that corner of the drawing: the head and the right
 # half were gone until the boot animation. post_init runs after upstream's
 # init_hal_gralloc, which waits for that driver.
+# Usage: otto_console_art [line...] (lines of text under him)
 otto_console_art() {
 	local art="${OTTO_ART:-/boot/otto/otto-ascii.txt}" tty="${OTTO_CONSOLE:-/dev/tty0}"
 	local size rows cols fb pad top spaces line
@@ -255,6 +256,7 @@ otto_console_art() {
 	esac
 	pad=$(((cols - 76) / 2))
 	top=$(((rows - 20) / 2))
+	[ $# -eq 0 ] || top=$(((rows - 21 - $#) / 2))
 	[ "$pad" -ge 0 ] || pad=0
 	[ "$top" -ge 0 ] || top=0
 	spaces=$(printf "%${pad}s" "")
@@ -268,12 +270,66 @@ otto_console_art() {
 		while IFS= read -r line; do
 			echo "$spaces$line"
 		done <"$art"
+		[ $# -eq 0 ] || echo
+		for line in "$@"; do
+			pad=$(((cols - ${#line}) / 2))
+			[ "$pad" -ge 0 ] || pad=0
+			printf "%${pad}s%s\n" "" "$line"
+		done
 	} >"$tty" 2>/dev/null
+}
+
+# A first boot, which takes minutes (and every live boot: the live system
+# starts from scratch). Upstream writes post_inst_complete at the end of its
+# do_bootcomplete, once its bundled apps are installed; the initrd
+# (otto_first_boot in 9-otto, text_art) decides the same way.
+otto_first_boot() {
+	[ ! -e "${OTTO_POST_INST:-/data/vendor/post_inst_complete}" ]
+}
+
+# On a first boot the home screen comes up empty when the boot animation
+# ends, and stays so for a minute or more: Android unlocks the user, our
+# boot-complete step sets things up, the first-run screen opens. An empty
+# screen looks stuck, so "Almost ready" (PreparingActivity, in our app)
+# covers it: started in the background when the boot animation ends, told
+# to go (READY) when boot complete is done with it, which also sets
+# OTTO_READY_PROP. The first-run screen covering it closes it too.
+OTTO_PREPARING_APP=app.ottotv.connect/.PreparingActivity
+OTTO_READY_PROP=otto.boot.ready
+otto_show_preparing() {
+	# In the detached shell, $0 is the property and $1 the activity.
+	# shellcheck disable=SC2016  # expanded by the detached shell
+	otto_detach '
+		i=0
+		until [ "$(getprop service.bootanim.exit)" = 1 ]; do
+			[ "$i" -lt 900 ] || exit 0
+			sleep 1
+			i=$((i + 1))
+		done
+		[ "$(getprop "$0")" = 1 ] && exit 0
+		am start -n "$1" >/dev/null 2>&1 && log -t otto "showing the preparing screen"
+		i=0
+		until [ "$(getprop "$0")" = 1 ]; do
+			[ "$i" -lt 900 ] || exit 0
+			sleep 1
+			i=$((i + 1))
+		done
+		# Again a little later, in case it was still opening.
+		for i in 1 2 3; do
+			am broadcast -a app.ottotv.connect.READY -p app.ottotv.connect >/dev/null 2>&1
+			sleep 2
+		done
+	' "$OTTO_READY_PROP" "$OTTO_PREPARING_APP"
 }
 
 post_init() {
 	otto_log "post_init"
-	otto_console_art
+	if otto_first_boot; then
+		otto_console_art "Preparando o Otto TV pela primeira vez." "Isso leva alguns minutos."
+		[ "${OTTO_SETUP:-ours}" = wizard ] || otto_show_preparing
+	else
+		otto_console_art
+	fi
 	# Persistent props load later and win, so a language the user picked stays.
 	set_prop_if_empty persist.sys.locale "${OTTO_LOCALE:-pt-BR}"
 	otto_setup_mirror
@@ -311,6 +367,8 @@ otto_bootcomplete_early() {
 	otto_wait_for_apps
 	otto_setup_ime
 	[ -z "$remote" ] || otto_offer_pairing
+	# "Almost ready" can go (otto_show_preparing).
+	setprop "$OTTO_READY_PROP" 1
 }
 
 post_bootcomplete() {

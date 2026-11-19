@@ -72,9 +72,13 @@ expect "hdmi: finds the TV on the second sound card" "pcmC1D3p" \
 
 # --- post_init end to end, with Android's commands mocked ---------------------
 
-# The console Otto is drawn on, and the drawing.
-export OTTO_CONSOLE="$TMP/console" OTTO_ART="$ROOT/art/brand/otto-ascii.txt"
+# The console Otto is drawn on, and the drawing. Not a first boot, unless
+# a test says so.
+export OTTO_CONSOLE="$TMP/console" OTTO_ART="$ROOT/art/brand/otto-ascii.txt" OTTO_POST_INST="$TMP/post_inst_complete"
 : >"$OTTO_CONSOLE"
+touch "$OTTO_POST_INST"
+# The two lines a first boot shows under Otto, centered on 170 columns.
+first_caption="$(printf '%65s%s' '' 'Preparando o Otto TV pela primeira vez.')|$(printf '%72s%s' '' 'Isso leva alguns minutos.')"
 
 # shellcheck disable=SC2329  # mocks, called by the hooks under test
 {
@@ -105,11 +109,78 @@ unset -f alsa_amixer setprop getprop set_prop_if_empty log setsid
 # Otto redrawn once the GPU driver has the screen: 1366x768 in 8x16, as the
 # initrd centers it.
 echo 1366,768 >"$TMP/fb_size"
+console() { sed 's/^\x1b\[2J\x1b\[H\x1b\[?25l//' "$OTTO_CONSOLE"; }
 : >"$OTTO_CONSOLE"
 OTTO_FB_SIZE="$TMP/fb_size" otto_console_art
 expect "console: Otto redrawn 14 lines down, 47 spaces in" \
-	"14|$(printf '%47s%s' '' "$(head -n 1 "$OTTO_ART")")" \
-	"$(sed 's/^\x1b\[2J\x1b\[H\x1b\[?25l//' "$OTTO_CONSOLE" | awk 'NF { print NR - 1; exit }')|$(sed 's/^\x1b\[2J\x1b\[H\x1b\[?25l//' "$OTTO_CONSOLE" | awk 'NF' | head -n 1)"
+	"14|$(printf '%47s%s' '' "$(head -n 1 "$OTTO_ART")")|20" \
+	"$(console | awk 'NF { print NR - 1; exit }')|$(console | awk 'NF' | head -n 1)|$(console | grep -c .)"
+
+# A first boot: the same two lines as the initrd's under him, and "Almost
+# ready" for when the boot animation ends.
+# shellcheck disable=SC2329  # mocks, called by post_init
+{
+	otto_show_preparing() { echo preparing >>"$TMP/calls"; }
+	set_prop_if_empty() { :; }
+	otto_setup_mirror() { :; }
+	otto_setup_audio() { :; }
+	stty() { echo "48 170"; }
+	log() { :; }
+}
+: >"$TMP/calls"
+: >"$OTTO_CONSOLE"
+OTTO_POST_INST="$TMP/none" post_init
+expect "first boot: the initrd's two lines, and Almost ready" \
+	"12|$first_caption|preparing" \
+	"$(console | awk 'NF { print NR - 1; exit }')|$(console | tail -n 2 | paste -sd'|')|$(cat "$TMP/calls")"
+: >"$TMP/calls"
+: >"$OTTO_CONSOLE"
+post_init
+expect "first boot: nothing of it on later boots" "20|" "$(console | grep -c .)|$(cat "$TMP/calls")"
+: >"$TMP/calls"
+OTTO_POST_INST="$TMP/none" OTTO_SETUP=wizard post_init
+expect "first boot: no Almost ready over upstream's wizard" "" "$(cat "$TMP/calls")"
+unset -f otto_show_preparing set_prop_if_empty otto_setup_mirror otto_setup_audio stty log
+# shellcheck source=iso/otto/init-hooks.sh
+source "$ROOT/iso/otto/init-hooks.sh"
+
+# "Almost ready" itself, with Android's commands as stubs: shown when the
+# boot animation ends, told to go once boot complete sets the property.
+stubs="$TMP/prep-bin"
+mkdir -p "$stubs"
+cat >"$stubs/getprop" <<'STUB'
+#!/bin/sh
+cat "$PREP/$1" 2>/dev/null
+STUB
+cat >"$stubs/am" <<'STUB'
+#!/bin/sh
+echo "am $1 $3" >>"$PREP/log"
+STUB
+printf '#!/bin/sh\n:\n' >"$stubs/log"
+printf '#!/bin/sh\nexec /bin/sleep 0.05\n' >"$stubs/sleep"
+chmod +x "$stubs"/*
+# Usage: preparing <ready before the animation ends: 0|1> (prints what ran)
+preparing() {
+	export PREP="$TMP/prep"
+	rm -rf "$PREP"
+	mkdir -p "$PREP"
+	echo "$1" >"$PREP/otto.boot.ready"
+	(
+		# shellcheck disable=SC2329  # mock, called by otto_detach
+		setsid() { "$@"; }
+		PATH="$stubs:$PATH" OTTO_CGROUP_PROCS=/dev/null otto_show_preparing
+		/bin/sleep 0.3
+		echo 1 >"$PREP/service.bootanim.exit"
+		/bin/sleep 0.3
+		echo 1 >"$PREP/otto.boot.ready"
+		wait
+	)
+	paste -sd'|' "$PREP/log" 2>/dev/null
+}
+expect "almost ready: shown after the boot animation, closed when boot complete is done" \
+	"am start app.ottotv.connect/.PreparingActivity|am broadcast app.ottotv.connect.READY|am broadcast app.ottotv.connect.READY|am broadcast app.ottotv.connect.READY" \
+	"$(preparing 0)"
+expect "almost ready: not shown when boot complete was quicker" "" "$(preparing 1)"
 
 # --- On-screen keyboard ---------------------------------------------------------
 
@@ -237,22 +308,23 @@ unset -f settings log
 	otto_start_remote() { echo remote >>"$TMP/calls"; [ -z "${REMOTE_FAILS:-}" ]; }
 	otto_wait_for_apps() { echo wait >>"$TMP/calls"; }
 	otto_offer_pairing() { echo pairing >>"$TMP/calls"; }
+	setprop() { echo "$1=$2" >>"$TMP/calls"; }
 	getprop() { echo pcmC0D3p; }
 	log() { :; }
 }
 : >"$TMP/calls"
 (otto_bootcomplete_early && post_bootcomplete)
 expect "bootcomplete: early call does the work, post_bootcomplete doesn't repeat it" \
-	"mirror|setup|remote|wait|ime|pairing" "$(paste -sd'|' "$TMP/calls")"
+	"mirror|setup|remote|wait|ime|pairing|otto.boot.ready=1" "$(paste -sd'|' "$TMP/calls")"
 : >"$TMP/calls"
 (post_bootcomplete)
 expect "bootcomplete: post_bootcomplete steps in without the early call" \
-	"mirror|setup|remote|wait|ime|pairing" "$(paste -sd'|' "$TMP/calls")"
+	"mirror|setup|remote|wait|ime|pairing|otto.boot.ready=1" "$(paste -sd'|' "$TMP/calls")"
 : >"$TMP/calls"
 (REMOTE_FAILS=1 otto_bootcomplete_early)
 expect "bootcomplete: no pairing screen when the remote didn't start" \
-	"mirror|setup|remote|wait|ime" "$(paste -sd'|' "$TMP/calls")"
-unset -f otto_setup_mirror otto_setup_ime otto_start_remote otto_wait_for_apps otto_offer_pairing getprop log
+	"mirror|setup|remote|wait|ime|otto.boot.ready=1" "$(paste -sd'|' "$TMP/calls")"
+unset -f otto_setup_mirror otto_setup_ime otto_start_remote otto_wait_for_apps otto_offer_pairing setprop getprop log
 # shellcheck source=iso/otto/init-hooks.sh
 source "$ROOT/iso/otto/init-hooks.sh"
 
@@ -350,19 +422,37 @@ else
 fi
 
 # text_art centers Otto on a 170x48 console (1366x768 with the 8x16 font).
-art=$(
+# Usage: initrd_art [VAR=value...]
+initrd_art() (
 	# shellcheck disable=SC2329  # mocks
 	clear() { :; }
 	# shellcheck disable=SC2329
 	stty() { echo "48 170"; }
 	eval "$(sed -n '/^text_art() {/,/^}/p' "$TMP/init")"
-	OTTO_ART="$ROOT/art/brand/otto-ascii.txt" text_art
+	# shellcheck disable=SC2030  # meant for this subshell only
+	export OTTO_ART="$ROOT/art/brand/otto-ascii.txt" OTTO_DATA="$TMP/art-data" OTTO_CMDLINE="$TMP/art-cmdline"
+	for v in "$@"; do export "${v?}"; done
+	text_art
 )
+mkdir -p "$TMP/art-data/vendor"
+touch "$TMP/art-data/vendor/post_inst_complete"
+echo "quiet" >"$TMP/art-cmdline"
+art=$(initrd_art)
 expect "initrd: Otto starts 14 lines down" "14" \
 	"$(printf '%s\n' "$art" | awk 'NF { print NR - 1; exit }')"
 expect "initrd: Otto is centered (47 more spaces)" \
 	"$(printf '%47s%s' '' "$(head -n 1 "$ROOT/art/brand/otto-ascii.txt")")" \
 	"$(printf '%s\n' "$art" | sed -n 15p)"
+expect "initrd: no caption once the first boot is done" "20" "$(printf '%s\n' "$art" | grep -c .)"
+# First boot: two lines under Otto, everything 2 lines higher.
+rm "$TMP/art-data/vendor/post_inst_complete"
+art=$(initrd_art)
+expect "initrd: first boot says it takes minutes" "12|$first_caption" \
+	"$(printf '%s\n' "$art" | awk 'NF { print NR - 1; exit }')|$(printf '%s\n' "$art" | tail -n 2 | paste -sd'|')"
+expect "initrd: the live system always starts from scratch" "22" \
+	"$(echo "androidboot.live=true quiet" >"$TMP/art-cmdline"; initrd_art OTTO_DATA="$TMP/none" | grep -c .)"
+expect "initrd: not the installer" "20" \
+	"$(initrd_art OTTO_DATA="$TMP/none" INSTALL=install.sfs | grep -c .)"
 expect "initrd: the art is plain ASCII, 76x20 at most" "ok" \
 	"$(LC_ALL=C awk 'length($0) > 76 || /[^ -~]/ { bad = 1 } END { print (NR <= 20 && !bad) ? "ok" : "bad" }' "$ROOT/art/brand/otto-ascii.txt")"
 
@@ -462,6 +552,7 @@ to_ram() {
 	head -c 3000000 /dev/urandom >"$r/mnt/iso/install.sfs"
 	printf 'MemAvailable:   %s kB\n' "$kb" >"$r/meminfo"
 	(
+		# shellcheck disable=SC2030  # meant for this subshell only
 		export OTTO_MNT="$r/mnt" SRC=iso OTTO_RAMDIR="$r/ram" OTTO_MEMINFO="$r/meminfo"
 		for v in "$@"; do export "${v?}"; done
 		# Sourced as the initrd does, with mount mocked.
@@ -567,20 +658,37 @@ expect "installed menu: safe video passes nomodeset" "1" \
 
 # --- Boot animation (initrd hook) -----------------------------------------------
 
-mkdir -p "$TMP/anim/mnt/live/otto" "$TMP/anim/android/system/product/media"
+mkdir -p "$TMP/anim/mnt/live/otto" "$TMP/anim/android/system/product/media" "$TMP/anim/mnt/live/data/vendor"
 echo otto >"$TMP/anim/mnt/live/otto/bootanimation.zip"
+echo first >"$TMP/anim/mnt/live/otto/bootanimation-first.zip"
 touch "$TMP/anim/android/system/product/media/bootanimation.zip" \
-	"$TMP/anim/android/system/product/media/bootanimation-dark.zip"
-: >"$TMP/calls"
-(
-	# shellcheck disable=SC2329  # mock
-	mount() { echo "mount $*" >>"$TMP/calls"; }
-	# The hook reads /mnt/$SRC: point it at the fake one.
-	SRC="../$TMP/anim/mnt/live" OTTO_ANDROID="$TMP/anim/android" otto_boot_animation
-)
+	"$TMP/anim/android/system/product/media/bootanimation-dark.zip" \
+	"$TMP/anim/mnt/live/data/vendor/post_inst_complete"
+# Usage: anim_mounts [VAR=value...] (prints the bind mounts)
+anim_mounts() {
+	: >"$TMP/calls"
+	(
+		# shellcheck disable=SC2329  # mock
+		mount() { echo "mount $*" >>"$TMP/calls"; }
+		# The hook reads /mnt/$SRC: point it at the fake one.
+		# shellcheck disable=SC2030,SC2031  # meant for this subshell only
+		export SRC="../$TMP/anim/mnt/live" OTTO_ANDROID="$TMP/anim/android" OTTO_CMDLINE="$TMP/art-cmdline"
+		for v in "$@"; do export "${v?}"; done
+		otto_boot_animation
+	)
+	sed "s#/mnt/../$TMP/anim/mnt/live/otto/##; s# $TMP/anim/android/system/product/media/# #" "$TMP/calls" | paste -sd'|'
+}
+echo quiet >"$TMP/art-cmdline"
 expect "boot animation: Otto over both of upstream's" \
-	"mount --bind /mnt/../$TMP/anim/mnt/live/otto/bootanimation.zip $TMP/anim/android/system/product/media/bootanimation.zip|mount --bind /mnt/../$TMP/anim/mnt/live/otto/bootanimation.zip $TMP/anim/android/system/product/media/bootanimation-dark.zip" \
-	"$(paste -sd'|' "$TMP/calls")"
+	"mount --bind bootanimation.zip bootanimation.zip|mount --bind bootanimation.zip bootanimation-dark.zip" \
+	"$(anim_mounts)"
+rm "$TMP/anim/mnt/live/data/vendor/post_inst_complete"
+expect "boot animation: the first boot's says it takes minutes" \
+	"mount --bind bootanimation-first.zip bootanimation.zip|mount --bind bootanimation-first.zip bootanimation-dark.zip" \
+	"$(anim_mounts)"
+expect "boot animation: so does the live system's, every time" \
+	"mount --bind bootanimation-first.zip bootanimation.zip|mount --bind bootanimation-first.zip bootanimation-dark.zip" \
+	"$(echo androidboot.live=true >"$TMP/art-cmdline"; anim_mounts OTTO_DATA="$TMP/none")"
 expect "boot animation: stored zip with Android's desc.txt" "640 640 24|p 0 0 part0 #161B22|36" \
 	"$(unzip -p "$ROOT/iso/otto/bootanimation.zip" desc.txt | paste -sd'|')|$(unzip -l "$ROOT/iso/otto/bootanimation.zip" | grep -c 'part0/[0-9]*\.png')"
 expect "boot animation: frames are stored, not deflated" "0" \

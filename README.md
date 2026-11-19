@@ -4,7 +4,7 @@ Turn an old PC or laptop into a fast, plug-and-play Android TV for any TV.
 Flash a USB stick, plug the computer into the TV over HDMI, try it live, then
 install it.
 
-> Status: **v0.4.3, early development.** Tested on one machine so far:
+> Status: **v0.4.4, early development.** Tested on one machine so far:
 > [Acer HM77 / Ivy Bridge](docs/hardware/acer-hm77-ivybridge.md).
 
 **What it needs:** a 64-bit PC with SSE4.2 (Android 14 requires it: Intel
@@ -33,6 +33,7 @@ USB stick
  │      │    ├─ overlays /system/etc/user_app (add/remove first-boot apps)
  │      │    ├─ bind-mounts key layouts where Esc sends Back
  │      │    ├─ bind-mounts Otto's boot animation over LineageOS's
+ │      │    │  (on a first boot, one that says it takes minutes)
  │      │    ├─ bind-mounts /otto on /boot/otto (Android only sees
  │      │    │  the media's /boot folder, so that's where it finds us)
  │      │    └─ hides upstream's setup wizard and updater (whiteouts)
@@ -45,6 +46,8 @@ USB stick
  └─ Android: /system/etc/init.sh calls
      post_init / post_bootcomplete
      (defined nowhere)                        ← ours: iso/otto/init-hooks.sh
+        ├─ redraws Otto in text once the GPU driver has the screen
+        ├─ first boot: "Almost ready" over the still-empty home screen
         ├─ finds the HDMI output with a TV attached and routes audio to it
         ├─ picks the on-screen keyboard (none with a physical keyboard)
         └─ starts otto-remote, the phone remote   ← ours: remote/ (Go)

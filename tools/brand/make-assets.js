@@ -8,10 +8,10 @@
 // Writes:
 //   art/brand/*.svg                           the brand's SVG files (from otto-geo.js)
 //   iso/boot/grub/themes/otto/logo.png        boot menu logo
-//   iso/otto/bootanimation.zip                Android boot animation
+//   iso/otto/bootanimation{,-first}.zip       Android boot animation
 //   iso/otto/installer/branding/otto/*.png    installer images
 //   iso/otto/installer/wallpaper.png          installer desktop
-//   tvapp/res/drawable*/{icon,banner}.png     "Connect phone" app
+//   tvapp/res/drawable*/{icon,banner,preparing}.png  "Connect phone" app
 //   remote/web/static/icon-*.png              phone remote (home screen icon)
 const fs = require('fs');
 const os = require('os');
@@ -85,17 +85,22 @@ async function bootMenuLogo(browser) {
   await render(browser, row(18, mark(84), word(46)), path.join(ROOT, 'iso/boot/grub/themes/otto/logo.png'));
 }
 
-async function bootAnimation(browser) {
-  // Boot-animation: 336 px Otto with the name under it, centered in a
-  // 640x640 square; the rest of the screen is the background color.
+// Boot-animation: 336 px Otto with the name under it, centered in a 640x640
+// square; the rest of the screen is the background color. The first boot's
+// (bootanimation-first.zip, chosen by iso/scripts/9-otto) adds two lines:
+// that boot takes minutes.
+async function bootAnimation(browser, name, caption) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'otto-boot-'));
   const part = path.join(tmp, 'part0');
   fs.mkdirSync(part);
+  const lines = caption
+    ? '<p style="margin:12px 0 0;font-size:24px;font-weight:500;line-height:32px;color:#A9B3C1;text-align:center">' + caption.join('<br>') + '</p>'
+    : '';
   for (let n = 0; n < G.BOOT_FRAMES; n++) {
     const html =
-      '<div style="width:640px;height:640px;background:' + BG + ';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">' +
+      '<div style="width:640px;height:640px;background:' + BG + ';display:flex;flex-direction:column;align-items:center;justify-content:center">' +
       '<svg viewBox="30 40 140 140" width="336" height="336">' + G.bootOtto(n) + '</svg>' +
-      '<p style="margin:0;font-size:56px;font-weight:800;line-height:68px;letter-spacing:-0.03em">Otto TV</p></div>';
+      '<p style="margin:16px 0 0;font-size:56px;font-weight:800;line-height:68px;letter-spacing:-0.03em">Otto TV</p>' + lines + '</div>';
     const page = await browser.newPage();
     await page.setContent('<!doctype html><meta charset="utf-8"><style>' + CSS + '</style><div id="a">' + html + '</div>');
     await page.evaluate(() => document.fonts.ready);
@@ -106,7 +111,7 @@ async function bootAnimation(browser) {
   // (A FADE count before the color is for "f" parts only: in 0.4.2 it made
   // Android skip the color, and the square showed on black.)
   fs.writeFileSync(path.join(tmp, 'desc.txt'), '640 640 ' + G.BOOT_FPS + '\np 0 0 part0 #161B22\n');
-  const out = path.join(ROOT, 'iso/otto/bootanimation.zip');
+  const out = path.join(ROOT, 'iso/otto', name);
   fs.rmSync(out, { force: true });
   // Android reads the frames in place: the zip must be stored, not deflated.
   execFileSync('zip', ['-q', '-0', '-X', '-r', out, 'desc.txt', 'part0'], { cwd: tmp });
@@ -187,6 +192,10 @@ async function connectApp(browser) {
       G.P(G.rrect(137.5, 46.5, 17, 29, 2.5), PANEL) + G.P(G.circ(146, 66, 3.4), '#F2B25C') + '</g>' }) + '</svg>' +
     '<p style="margin:0;font-size:30px;font-weight:800;line-height:34px;letter-spacing:-0.02em">' + l1 + '<br>' + l2 + '</p></div>';
   await render(browser, banner('Conectar', 'celular'), path.join(ROOT, 'tvapp/res/drawable-pt-nodpi/banner.png'), { opaque: true });
+  // "Almost ready" (PreparingActivity): Otto waving, drawn at 200 dp on
+  // screens up to xhdpi.
+  await render(browser, '<svg viewBox="28 22 150 150" width="400" height="400">' + G.pose('wave') + '</svg>',
+    path.join(ROOT, 'tvapp/res/drawable-nodpi/preparing.png'));
   await render(browser, banner('Connect', 'phone'), path.join(ROOT, 'tvapp/res/drawable-nodpi/banner.png'), { opaque: true });
 }
 
@@ -207,7 +216,8 @@ async function phoneRemote(browser) {
   try {
     brandSvgs();
     await bootMenuLogo(browser);
-    await bootAnimation(browser);
+    await bootAnimation(browser, 'bootanimation.zip');
+    await bootAnimation(browser, 'bootanimation-first.zip', ['Preparando tudo pela primeira vez.', 'Isso leva alguns minutos.']);
     await installer(browser);
     await installerWallpaper(browser);
     await connectApp(browser);

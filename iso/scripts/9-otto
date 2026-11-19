@@ -343,15 +343,32 @@ otto_installer_to_ram() {
 	return 0
 }
 
-# Otto's boot animation over LineageOS's (it has a light and a dark one).
+# A first boot, which takes minutes: Android's data has no
+# post_inst_complete yet (upstream writes it once its bundled apps are
+# installed), or a live system, which starts from scratch every time.
+# text_art, in the initrd's /init, decides the same way.
+otto_first_boot() {
+	local data="${OTTO_DATA:-/mnt/$SRC/data}"
+	if [ -d "$data" ]; then
+		[ ! -e "$data/vendor/post_inst_complete" ]
+	else
+		grep -q androidboot.live=true "${OTTO_CMDLINE:-/proc/cmdline}"
+	fi
+}
+
+# Otto's boot animation over LineageOS's (it has a light and a dark one). On
+# a first boot, the one that says it takes a few minutes.
 otto_boot_animation() {
 	local zip="/mnt/$SRC/otto/bootanimation.zip"
 	local media="${OTTO_ANDROID:-/android}/system/product/media" f
+	if otto_first_boot && [ -f "/mnt/$SRC/otto/bootanimation-first.zip" ]; then
+		zip="/mnt/$SRC/otto/bootanimation-first.zip"
+	fi
 	[ -f "$zip" ] || return 0
 	for f in bootanimation.zip bootanimation-dark.zip; do
 		[ -f "$media/$f" ] && mount --bind "$zip" "$media/$f"
 	done
-	otto_msg "boot animation: Otto"
+	otto_msg "boot animation: ${zip##*/}"
 }
 
 post_detect() {
