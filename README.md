@@ -208,7 +208,10 @@ tools/setup-android-sdk.sh && export ANDROID_HOME=~/android-sdk
 ```
 
 The TV app is built without Gradle (`tools/build-tv-app.sh`: aapt2, javac,
-d8, apksigner), and signed with a key kept in `cache/otto.keystore`.
+d8, apksigner), and signed with a key kept in `cache/otto.keystore`, with
+its password in `cache/otto.keystore.pass`. Both are made on the first build
+and never leave `cache/` (ignored by git): updates of the app only install
+when they are signed with the same key, so keep a backup of the pair.
 `OTTO_PREBUILT=<dir>` takes `otto-remote` and `app.ottotv.connect.apk` from a
 folder instead of compiling them.
 

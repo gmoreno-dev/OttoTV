@@ -63,13 +63,19 @@ fi
 "$BT/d8" --release --min-api 28 --lib "$JAR" --output "$WORK/dex" @"$WORK/classlist"
 (cd "$WORK/dex" && zip -q "$WORK/app.apk" classes.dex)
 
+# The keystore's password lives next to it (<keystore>.pass), never in git:
+# whoever has both can sign apps that install over Otto TV's. A new
+# keystore gets a random one.
+PASS="$KEYSTORE.pass"
 if [ ! -f "$KEYSTORE" ]; then
 	mkdir -p "$(dirname "$KEYSTORE")"
+	(umask 077 && head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n' >"$PASS")
 	keytool -genkeypair -keystore "$KEYSTORE" -alias otto -keyalg RSA -keysize 2048 \
-		-validity 10000 -dname "CN=Otto TV" -storepass ottoapp -keypass ottoapp >/dev/null 2>&1
+		-validity 10000 -dname "CN=Otto TV" -storepass:file "$PASS" -keypass:file "$PASS" >/dev/null 2>&1
 fi
+[ -s "$PASS" ] || die "$PASS is missing: it holds the password of $KEYSTORE"
 "$BT/zipalign" -f 4 "$WORK/app.apk" "$WORK/aligned.apk"
-"$BT/apksigner" sign --ks "$KEYSTORE" --ks-pass pass:ottoapp --ks-key-alias otto \
+"$BT/apksigner" sign --ks "$KEYSTORE" --ks-pass "file:$PASS" --ks-key-alias otto \
 	--out "$OUT_APK" "$WORK/aligned.apk"
 rm -f "$OUT_APK.idsig"
 echo "built $OUT_APK ($VERSION, code $CODE)"
