@@ -468,6 +468,9 @@ otto_bootcomplete_early() {
 	[ -z "$remote" ] || otto_offer_pairing
 	# "Almost ready" can go (otto_show_preparing).
 	setprop "$OTTO_READY_PROP" 1
+	# The home screen is up: the boot prefetcher notes what the boot read
+	# (otto_prefetch in 9-otto).
+	mkdir -p "$OTTO_STATE" && : >"$OTTO_STATE/booted"
 }
 
 # The initrd raised disk read-ahead for the boot (otto_prefetch in 9-otto):

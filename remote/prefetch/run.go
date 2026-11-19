@@ -16,14 +16,19 @@ import (
 const MaxAge = 21 * 24 * time.Hour
 
 // MaxTime: reading longer than this would hold the boot up more than it helps.
-const MaxTime = 30 * time.Second
+const MaxTime = 45 * time.Second
 
 // Options for one boot's run.
 type Options struct {
-	List   string        // the list file
-	Paths  []string      // files and folders to record (the system image first)
-	Wait   time.Duration // how long after the start to record: once the boot is done
-	Budget int64         // most bytes to read
+	List  string        // the list file
+	Paths []string      // files and folders to record (the system image first)
+	Wait  time.Duration // the longest to wait before recording
+	// Ready is a file the boot touches once the home screen is up
+	// (init-hooks.sh, at boot complete): recording waits for it, then
+	// Settle, so the list holds what the boot read and not what came after.
+	Ready  string
+	Settle time.Duration
+	Budget int64 // most bytes to read
 	Now    func() time.Time
 	Sleep  func(time.Duration)
 	Log    io.Writer
@@ -43,13 +48,14 @@ func Run(o Options) error {
 	files, why := load(o.List, start)
 	if files != nil {
 		var read int64
+		changed := 0
 		for _, f := range files {
 			if read >= o.Budget || o.Now().Sub(start) > MaxTime {
 				lg.Printf("stopped early, at the budget or the time limit")
 				break
 			}
 			if !Same(f) {
-				lg.Printf("%s changed, skipped", f.Path)
+				changed++
 				continue
 			}
 			fh, err := os.Open(f.Path)
@@ -64,15 +70,23 @@ func Run(o Options) error {
 				lg.Printf("%s: %v", f.Path, err)
 			}
 		}
+		if changed > 0 {
+			lg.Printf("%d files changed since the list was made, skipped", changed)
+		}
 		lg.Printf("read %d MB in %.1fs", read>>20, o.Now().Sub(start).Seconds())
 		return nil
 	}
-	lg.Printf("no prefetch this boot (%s): recording in %s", why, o.Wait)
+	lg.Printf("no prefetch this boot (%s): recording once the boot is done", why)
 	os.Remove(o.List)
-	o.Sleep(o.Wait)
-	// 128 KB: on the Acer, merging parts up to 512 KB apart made the list
-	// 1.6 GB, more than 30 seconds of reading.
-	rec, err := Record(o.Paths, 128<<10, 20000, start)
+	waited := time.Duration(0)
+	for ; waited < o.Wait && !ready(o.Ready, start); waited += time.Second {
+		o.Sleep(time.Second)
+	}
+	if waited < o.Wait {
+		o.Sleep(o.Settle)
+	}
+	// 256 KB: a seek costs about as much as reading that much more.
+	rec, err := Record(o.Paths, 256<<10, 20000, start)
 	if err != nil {
 		return err
 	}
@@ -97,6 +111,15 @@ func Run(o Options) error {
 	}
 	lg.Printf("recorded %d MB in %d files", total>>20, len(rec))
 	return nil
+}
+
+// ready reports whether the boot touched path since start.
+func ready(path string, start time.Time) bool {
+	if path == "" {
+		return false
+	}
+	st, err := os.Stat(path)
+	return err == nil && !st.ModTime().Before(start.Add(-2*time.Second))
 }
 
 // load returns the list's files, or nil and why not.
@@ -124,7 +147,9 @@ func load(path string, now time.Time) ([]File, string) {
 func Main(args []string) int {
 	fl := flag.NewFlagSet("prefetch", flag.ContinueOnError)
 	list := fl.String("list", "", "the list file")
-	wait := fl.Duration("wait", 2*time.Minute, "how long to wait before recording")
+	wait := fl.Duration("wait", 3*time.Minute, "the longest to wait before recording")
+	readyPath := fl.String("ready", "", "file the boot touches when the home screen is up")
+	settle := fl.Duration("settle", 10*time.Second, "how long to wait after -ready before recording")
 	budget := fl.Int64("budget-mb", 0, "most megabytes to read (0: a quarter of the RAM, at most 1536)")
 	logPath := fl.String("log", "", "log file (default: next to the list)")
 	if err := fl.Parse(args); err != nil {
@@ -146,7 +171,8 @@ func Main(args []string) int {
 	if b <= 0 {
 		b = defaultBudget()
 	}
-	err := Run(Options{List: *list, Paths: fl.Args(), Wait: *wait, Budget: b, Log: out})
+	err := Run(Options{List: *list, Paths: fl.Args(), Wait: *wait, Ready: *readyPath, Settle: *settle,
+		Budget: b, Log: out})
 	if err != nil {
 		fmt.Fprintf(out, "prefetch: %v\n", err)
 		return 1

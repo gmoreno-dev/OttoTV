@@ -4,7 +4,7 @@ Turn an old PC or laptop into a fast, plug-and-play Android TV for any TV.
 Flash a USB stick, plug the computer into the TV over HDMI, try it live, then
 install it.
 
-> Status: **v0.6.1, early development.** Tested on one machine so far:
+> Status: **v0.6.2, early development.** Tested on one machine so far:
 > [Acer HM77 / Ivy Bridge](docs/hardware/acer-hm77-ivybridge.md).
 
 **What it needs:** a 64-bit PC with SSE4.2 (Android 14 requires it: Intel
@@ -143,12 +143,14 @@ moving to a new upstream release is mostly bumping the ISO hash.
   an HDMI screen dark until someone answers "Mirror to display?", asked on
   the laptop's own screen (unseen with that screen dark or the lid closed).
   Otto TV skips the question; `OTTO_MIRROR=ask` brings it back.
-- **Faster boots from a hard disk.** On the Acer, the boot spent most of its
-  time waiting for the disk: Android reads a few hundred MB in a scattered
-  order, one seek each time. After a boot, Otto TV notes which parts of the
-  system image and `/data` it read (in the order they sit on the disk);
-  on the next boot the initrd reads them in long sequential reads before
-  Android asks, with a larger read-ahead while the boot lasts. The list is
+- **Faster boots from a hard disk** (77 s to 42 s on the Acer). The boot
+  spent most of its time waiting for the disk: Android reads several
+  hundred MB in a scattered order, one seek each time. Once the home screen
+  is up, Otto TV notes which parts of the system image and `/data` the boot
+  read (in the order they sit on the disk); on the next boot the initrd
+  reads them in long sequential reads, holding the boot for up to 12
+  seconds while it reads alone on the disk, then alongside Android, with a
+  larger read-ahead while the boot lasts. SSDs are left alone. The list is
   made again every three weeks; `OTTO_PREFETCH=off` turns it off.
   Installed apps are compiled ahead of time once the boot settles, so their
   first opens don't run interpreted code (`OTTO_COMPILE=off`).

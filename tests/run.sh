@@ -980,7 +980,10 @@ source "$ROOT/iso/scripts/9-otto"
 
 pf="$TMP/pf"
 mkdir -p "$pf/otto/remote" "$pf/data/vendor" "$TMP/sysfs/block/loop0/loop" "$TMP/sysfs/block/loop0/queue" \
-	"$TMP/sysfs/block/sda/queue" "$TMP/pftmp"
+	"$TMP/sysfs/block/sda/queue" "$TMP/sysfs/block/sda/sda1" "$TMP/sysfs/class/block" "$TMP/pftmp" "$TMP/pfproc"
+ln -s ../../block/sda/sda1 "$TMP/sysfs/class/block/sda1"
+echo 1 >"$TMP/sysfs/block/sda/queue/rotational"
+echo "/dev/sda1 /mnt ext4 rw,relatime 0 0" >"$TMP/pfproc/mounts"
 touch "$pf/data/vendor/post_inst_complete" "$pf/system_a.img"
 echo "$pf/system_a.img" >"$TMP/sysfs/block/loop0/loop/backing_file"
 for q in sda loop0; do echo 128 >"$TMP/sysfs/block/$q/queue/read_ahead_kb"; done
@@ -990,22 +993,45 @@ echo "$@" >"$(dirname "$0")/prefetch-args"
 EOF
 prefetch() {
 	rm -f "$TMP/pftmp/prefetch-args"
-	SRC=../$pf OTTO_DATA="$pf/data" OTTO_SYSFS="$TMP/sysfs" OTTO_TMP="$TMP/pftmp" otto_prefetch
+	SRC=../$pf OTTO_DATA="$pf/data" OTTO_SYSFS="$TMP/sysfs" OTTO_PROC="$TMP/pfproc" OTTO_TMP="$TMP/pftmp" \
+		otto_prefetch
 	wait
 }
 prefetch
-expect "prefetch: recording boot, read-ahead left alone" "128" "$(cat "$TMP/sysfs/block/sda/queue/read_ahead_kb")"
+expect "prefetch: recording boot, read-ahead left alone" \
+	"prefetch -list /mnt/../$pf/otto/prefetch.list -ready /mnt/../$pf/data/misc/otto/booted $pf/system_a.img /mnt/../$pf/data.img /mnt/../$pf/data/dalvik-cache /mnt/../$pf/data/misc/apexdata /mnt/../$pf/data/app /mnt/../$pf/data/system /mnt/../$pf/data/system_de /mnt/../$pf/data/user_de|128" \
+	"$(cat "$TMP/pftmp/prefetch-args" 2>/dev/null)|$(cat "$TMP/sysfs/block/sda/queue/read_ahead_kb")"
 echo "otto-prefetch 1 1" >"$pf/otto/prefetch.list"
 prefetch
-expect "prefetch: started with the system image and /data, read-ahead up for the boot" \
-	"prefetch -list /mnt/../$pf/otto/prefetch.list $pf/system_a.img /mnt/../$pf/data.img /mnt/../$pf/data/dalvik-cache /mnt/../$pf/data/misc/apexdata /mnt/../$pf/data/app /mnt/../$pf/data/system /mnt/../$pf/data/system_de /mnt/../$pf/data/user_de|2048|2048" \
-	"$(cat "$TMP/pftmp/prefetch-args" 2>/dev/null)|$(cat "$TMP/sysfs/block/sda/queue/read_ahead_kb")|$(cat "$TMP/sysfs/block/loop0/queue/read_ahead_kb")"
+expect "prefetch: with a list, read-ahead up for the boot" "2048|2048" \
+	"$(cat "$TMP/sysfs/block/sda/queue/read_ahead_kb")|$(cat "$TMP/sysfs/block/loop0/queue/read_ahead_kb")"
+# The boot waits while it reads, up to OTTO_PREFETCH_HOLD seconds.
+cat >"$pf/otto/remote/otto-remote" <<'EOF'
+#!/bin/sh
+exec /bin/sleep 5
+EOF
+t0=$(date +%s)
+OTTO_PREFETCH_HOLD=2 SRC=../$pf OTTO_DATA="$pf/data" OTTO_SYSFS="$TMP/sysfs" OTTO_PROC="$TMP/pfproc" \
+	OTTO_TMP="$TMP/pftmp" otto_prefetch
+held=$(($(date +%s) - t0))
+expect "prefetch: the boot waits for it, but not past the hold" "yes" \
+	"$([ "$held" -ge 2 ] && [ "$held" -le 4 ] && echo yes || echo "no (${held}s)")"
+pkill -f "$TMP/pftmp/otto-prefetch" 2>/dev/null
+wait
+cat >"$pf/otto/remote/otto-remote" <<'EOF'
+#!/bin/sh
+echo "$@" >"$(dirname "$0")/prefetch-args"
+EOF
 rm "$pf/data/vendor/post_inst_complete"
 prefetch
 expect "prefetch: not on a first boot" "" "$(cat "$TMP/pftmp/prefetch-args" 2>/dev/null)"
 touch "$pf/data/vendor/post_inst_complete"
 OTTO_PREFETCH=off prefetch
 expect "prefetch: OTTO_PREFETCH=off" "" "$(cat "$TMP/pftmp/prefetch-args" 2>/dev/null)"
+echo 0 >"$TMP/sysfs/block/sda/queue/rotational"
+prefetch
+expect "prefetch: not on an SSD" "" "$(cat "$TMP/pftmp/prefetch-args" 2>/dev/null)"
+echo 1 >"$TMP/sysfs/block/sda/queue/rotational"
 echo "$pf/nothing.img" >"$TMP/sysfs/block/loop0/loop/backing_file"
 prefetch
 expect "prefetch: no system image, nothing to do" "" "$(cat "$TMP/pftmp/prefetch-args" 2>/dev/null)"

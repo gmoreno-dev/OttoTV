@@ -400,41 +400,59 @@ otto_boot_animation() {
 }
 
 # Boots from a hard disk spend most of their time waiting for the disk:
-# Android reads a few hundred MB of the system image and of /data in a
+# Android reads several hundred MB of the system image and of /data in a
 # scattered order, a seek each time. otto-remote's prefetcher reads what
-# the last boot read, in file order and long reads, before Android asks
-# for it, then exits; with no list yet it waits for the boot to finish and
-# notes what it read (remote/prefetch). It keeps running after
-# switch_root: from the initrd's root it still sees the partition at /mnt.
-# With a list, disk read-ahead goes up for the boot too (init-hooks.sh puts
-# it back).
-# Only installed systems (the list is kept next to our files); live ones
-# boot from a stick. OTTO_PREFETCH=off turns it off.
+# the last boot read, in disk order and long reads (remote/prefetch). With
+# no list yet, it waits for the home screen (init-hooks.sh touches
+# data/misc/otto/booted), notes what was read and exits.
+#
+# With a list, the boot waits up to OTTO_PREFETCH_HOLD seconds (12) while
+# it reads: alone on the disk it reads at full speed, while Android's own
+# scattered reads would make it seek (on the Acer, reading alongside Android
+# managed a third of that). The rest is read alongside, and disk read-ahead
+# goes up for the boot (init-hooks.sh puts it back). The prefetcher keeps
+# running after switch_root: from the initrd's root it still sees the
+# partition at /mnt.
+#
+# Only installed systems on hard disks: live ones boot from a stick, and an
+# SSD doesn't seek. OTTO_PREFETCH=off turns it off.
 otto_prefetch() {
-	local dir="/mnt/$SRC" img q bin="${OTTO_TMP:-/tmp}/otto-prefetch"
-	local sys="${OTTO_SYSFS:-/sys}"
+	local dir="/mnt/$SRC" img q pid i dev rot bin="${OTTO_TMP:-/tmp}/otto-prefetch"
+	local sys="${OTTO_SYSFS:-/sys}" list="/mnt/$SRC/otto/prefetch.list"
 	[ "${OTTO_PREFETCH:-on}" = on ] || return 0
 	[ -w "$dir/otto" ] && [ -f "$dir/otto/remote/otto-remote" ] || return 0
 	# A first boot installs apps and compiles: nothing like the boots after it.
 	otto_first_boot && return 0
 	img=$(cat "$sys/block/loop0/loop/backing_file" 2>/dev/null)
 	[ -f "$img" ] || return 0
-	# Only with a list: a boot that records one should read what it needs,
-	# not what a large read-ahead drags along.
-	if [ -f "$dir/otto/prefetch.list" ]; then
-		for q in "$sys"/block/sd*/queue "$sys/block/loop0/queue"; do
-			[ -w "$q/read_ahead_kb" ] && echo 2048 >"$q/read_ahead_kb"
-		done
+	dev=$(awk '$2 == "/mnt" { sub("^/dev/", "", $1); print $1; exit }' "${OTTO_PROC:-/proc}/mounts")
+	rot=$(cat "$sys/class/block/$dev/queue/rotational" "$sys/class/block/$dev/../queue/rotational" 2>/dev/null | head -n 1)
+	if [ "$rot" = 0 ]; then
+		otto_msg "prefetch: $dev is not a hard disk, not needed"
+		return 0
 	fi
 	# A copy in RAM: the partition may be mounted noexec.
 	cp "$dir/otto/remote/otto-remote" "$bin" && chmod 755 "$bin" || return 0
 	(
 		cd /
-		exec "$bin" prefetch -list "$dir/otto/prefetch.list" "$img" "$dir/data.img" \
+		exec "$bin" prefetch -list "$list" -ready "$dir/data/misc/otto/booted" "$img" "$dir/data.img" \
 			"$dir/data/dalvik-cache" "$dir/data/misc/apexdata" "$dir/data/app" \
 			"$dir/data/system" "$dir/data/system_de" "$dir/data/user_de"
 	) </dev/null >/dev/null 2>&1 &
-	otto_msg "prefetch: started ($(basename "$img"))"
+	pid=$!
+	if [ ! -f "$list" ]; then
+		otto_msg "prefetch: recording this boot ($(basename "$img"))"
+		return 0
+	fi
+	for q in "$sys"/block/sd*/queue "$sys/block/loop0/queue"; do
+		[ -w "$q/read_ahead_kb" ] && echo 2048 >"$q/read_ahead_kb"
+	done
+	i=0
+	while [ "$i" -lt "${OTTO_PREFETCH_HOLD:-12}" ] && kill -0 "$pid" 2>/dev/null; do
+		sleep 1
+		i=$((i + 1))
+	done
+	otto_msg "prefetch: reading ($(basename "$img")), boot held ${i}s"
 }
 
 post_detect() {

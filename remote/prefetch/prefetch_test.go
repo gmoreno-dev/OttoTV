@@ -2,6 +2,7 @@ package prefetch
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -134,7 +135,7 @@ func TestRunRecordsThenPrefetches(t *testing.T) {
 	if err := Run(o); err != nil {
 		t.Fatal(err)
 	}
-	if slept != 90*time.Second || !strings.Contains(logs.String(), "recorded") {
+	if slept != 90*time.Second || !strings.Contains(logs.String(), "recorded") { // no Ready: the full wait
 		t.Fatalf("slept %v, log %q", slept, logs.String())
 	}
 	b, _ := os.ReadFile(list)
@@ -155,7 +156,7 @@ func TestRunRecordsThenPrefetches(t *testing.T) {
 	os.WriteFile(img, make([]byte, 2<<20), 0o644)
 	logs.Reset()
 	Run(o)
-	if !strings.Contains(logs.String(), "changed, skipped") {
+	if !strings.Contains(logs.String(), "1 files changed since the list was made, skipped") {
 		t.Errorf("log %q", logs.String())
 	}
 	// After three weeks the list is made again.
@@ -199,5 +200,38 @@ func TestRecordSkipsFilesWrittenThisBoot(t *testing.T) {
 	files, err := Record([]string{dir}, 0, 10, boot)
 	if err != nil || len(files) != 1 || files[0].Path != old {
 		t.Fatalf("got %+v, %v", files, err)
+	}
+}
+
+func TestRecordingWaitsForTheHomeScreen(t *testing.T) {
+	dir := t.TempDir()
+	img := filepath.Join(dir, "system.img")
+	os.WriteFile(img, make([]byte, 1<<20), 0o644)
+	marker := filepath.Join(dir, "booted")
+	start := time.Now().Add(time.Hour) // files older than the boot
+	var slept time.Duration
+	o := Options{List: filepath.Join(dir, "list"), Paths: []string{img}, Wait: time.Minute, Ready: marker,
+		Settle: 10 * time.Second, Budget: 1 << 30, Now: func() time.Time { return start }, Log: io.Discard,
+		Sleep: func(d time.Duration) {
+			slept += d
+			if slept == 5*time.Second { // the home screen shows 5 s in
+				os.WriteFile(marker, nil, 0o644)
+				os.Chtimes(marker, start, start)
+			}
+		}}
+	if err := Run(o); err != nil {
+		t.Fatal(err)
+	}
+	if slept != 15*time.Second {
+		t.Errorf("waited %v, want 5 s + 10 s", slept)
+	}
+	// A marker left by an earlier boot doesn't count: the full wait.
+	os.Remove(o.List)
+	os.Chtimes(marker, start.Add(-time.Hour), start.Add(-time.Hour))
+	slept = 0
+	o.Sleep = func(d time.Duration) { slept += d }
+	Run(o)
+	if slept != time.Minute {
+		t.Errorf("waited %v with a stale marker", slept)
 	}
 }
