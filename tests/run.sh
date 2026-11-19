@@ -6,6 +6,9 @@ set -uo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 FIX="$ROOT/tests/fixtures"
 TMP=$(mktemp -d)
+# Exported: mocks run in child shells too (otto_detach), and CI runners,
+# unlike this machine, have no TMP of their own in the environment.
+export TMP
 trap 'rm -rf "$TMP"' EXIT
 
 failures=0
