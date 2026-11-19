@@ -172,6 +172,59 @@ func TestHeadersAllowOnlyThisServer(t *testing.T) {
 	}
 }
 
+func TestTheTVsNameOnTheNetwork(t *testing.T) {
+	s, _ := newTestServer(t)
+	name := ""
+	s.LocalName = func() string { return name }
+	h := s.Handler()
+
+	id := func(host string) map[string]string {
+		t.Helper()
+		w := get(h, "192.168.0.50:5000", host, "/api/id")
+		if w.Code != http.StatusOK || w.Header().Get("Access-Control-Allow-Origin") != "*" {
+			t.Fatalf("/api/id: %d, CORS %q", w.Code, w.Header().Get("Access-Control-Allow-Origin"))
+		}
+		var m map[string]string
+		json.Unmarshal(w.Body.Bytes(), &m)
+		return m
+	}
+	// Not claimed yet: no name, and the CSP adds nothing.
+	if m := id("192.168.0.42:8686"); m["local"] != "" || len(m["id"]) != 16 {
+		t.Errorf("before the name: %v", m)
+	}
+	csp := get(h, "192.168.0.50:5000", "192.168.0.42:8686", "/").Header().Get("Content-Security-Policy")
+	if strings.Contains(csp, ".local") {
+		t.Errorf("CSP before the name = %q", csp)
+	}
+
+	name = "otto-tv.local"
+	byIP, byName := id("192.168.0.42:8686"), id("otto-tv.local:8686")
+	if byIP["local"] != "otto-tv.local:8686" || byIP["id"] != byName["id"] {
+		t.Errorf("by IP %v, by name %v: want the name and the same id", byIP, byName)
+	}
+	if strings.Contains(byIP["id"], s.Pairing.Token()[:8]) {
+		t.Error("the id gives away the token")
+	}
+	// The page opened by IP may ask the name; under the name, 'self' does.
+	csp = get(h, "192.168.0.50:5000", "192.168.0.42:8686", "/").Header().Get("Content-Security-Policy")
+	if !strings.Contains(csp, "connect-src 'self' ws://192.168.0.42:8686 http://otto-tv.local:8686;") {
+		t.Errorf("CSP by IP = %q", csp)
+	}
+	csp = get(h, "192.168.0.50:5000", "otto-tv.local:8686", "/").Header().Get("Content-Security-Policy")
+	if !strings.Contains(csp, "connect-src 'self' ws://otto-tv.local:8686;") {
+		t.Errorf("CSP by name = %q", csp)
+	}
+
+	// Another TV has another id.
+	other, _ := newTestServer(t)
+	w := get(other.Handler(), "192.168.0.50:5000", "otto-tv.local:8686", "/api/id")
+	var m map[string]string
+	json.Unmarshal(w.Body.Bytes(), &m)
+	if m["id"] == byIP["id"] {
+		t.Error("two TVs share an id")
+	}
+}
+
 type fakeLaptop struct{ off, missing bool }
 
 func (l *fakeLaptop) Available() bool { return !l.missing }

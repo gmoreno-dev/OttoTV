@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"otto/remote/hotkeys"
+	"otto/remote/mdns"
 	"otto/remote/panel"
 	"otto/remote/prefetch"
 	"otto/remote/server"
@@ -50,6 +51,27 @@ func notify(app, kind, pkg string) {
 	}
 }
 
+// answerForName runs the mDNS responder, again after a while if the
+// network side fails.
+func answerForName(ctx context.Context, r *mdns.Responder) {
+	for {
+		c, err := mdns.Listen()
+		if err == nil {
+			r.Conn = c
+			err = r.Run(ctx)
+		}
+		if ctx.Err() != nil {
+			return
+		}
+		r.Log.Printf("%v (trying again in 30 s)", err)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(30 * time.Second):
+		}
+	}
+}
+
 func main() {
 	// The initrd starts us as the boot prefetcher too (iso/scripts/9-otto).
 	if len(os.Args) > 1 && os.Args[1] == "prefetch" {
@@ -61,6 +83,7 @@ func main() {
 	name := flag.String("name", productName, "name shown on the phone")
 	useHotkeys := flag.Bool("hotkeys", true, "keyboard shortcuts: Alt+F4 closes the app, Ctrl+Alt+Del opens the power menu")
 	app := flag.String("app", "app.ottotv.connect", "Otto TV's app: the launcher, its quick panel and notices")
+	localName := flag.String("mdns", "otto-tv", "the TV's name on the network (NAME.local); empty: none")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 	if *showVersion {
@@ -126,6 +149,18 @@ func main() {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	// The TV's name on the network, otto-tv.local: the phone remote keeps
+	// working when the router gives the TV a new address.
+	if *localName != "" {
+		names := &mdns.Responder{
+			Base:  *localName,
+			State: filepath.Join(*state, "mdns-name"),
+			Log:   log.New(os.Stderr, "otto-remote: mdns: ", log.LstdFlags|log.Lmsgprefix),
+		}
+		srv.LocalName = names.Host
+		go answerForName(ctx, names)
+	}
 
 	// The laptop's own screen, which can go dark while the TV is the screen.
 	laptop := panel.New("/sys/class/backlight", "/sys/class/drm", filepath.Join(*state, "laptop-screen"))

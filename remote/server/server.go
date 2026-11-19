@@ -4,6 +4,8 @@ package server
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -43,6 +45,9 @@ type Server struct {
 	// Panel opens the launcher's quick panel, or closes it when it is open
 	// (the phone's Panel button, like F2). May be nil.
 	Panel func()
+	// LocalName is the TV's name on the network, "otto-tv.local", once the
+	// mdns package has claimed it, else "". May be nil.
+	LocalName func() string
 
 	phones  atomic.Int32
 	pairsAt atomic.Int64 // unix nanos of the last phone that connected
@@ -73,13 +78,14 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /", http.FileServerFS(s.Static))
 	mux.HandleFunc("GET /ws", s.handleWS)
 	mux.HandleFunc("POST /api/pair", s.handlePair)
+	mux.HandleFunc("GET /api/id", s.handleID)
 	mux.HandleFunc("GET /tv", s.onlyFromTV(s.handleTV))
 	mux.HandleFunc("GET /tv/status", s.onlyFromTV(s.handleTVStatus))
 	s.appRoutes(mux)
-	return headers(mux)
+	return s.headers(mux)
 }
 
-func headers(next http.Handler) http.Handler {
+func (s *Server) headers(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("X-Content-Type-Options", "nosniff")
@@ -88,6 +94,11 @@ func headers(next http.Handler) http.Handler {
 		connect := "'self'"
 		if validHost.MatchString(r.Host) {
 			connect += " ws://" + r.Host
+		}
+		// The page opened by IP asks the TV's name whether it is there too
+		// (remote.js, moveToLocalName).
+		if local := s.localAddr(); local != "" && local != r.Host {
+			connect += " http://" + local
 		}
 		h.Set("Content-Security-Policy", "default-src 'self'; connect-src "+connect+
 			"; img-src 'self' data:; frame-ancestors 'none'")
@@ -337,6 +348,33 @@ func pinDigits(pin string) [2][]string {
 		d[min(i/3, 1)] = append(d[min(i/3, 1)], string(r))
 	}
 	return d
+}
+
+// localAddr is "otto-tv.local:8686", or "" while the TV has no name.
+func (s *Server) localAddr() string {
+	if s.LocalName == nil {
+		return ""
+	}
+	name := s.LocalName()
+	if name == "" || !validHost.MatchString(name) {
+		return ""
+	}
+	return fmt.Sprintf("%s:%d", name, s.Port)
+}
+
+// handleID tells a phone's page which TV this is and its name on the
+// network. A page opened by IP address (the QR code has one: every phone
+// can open it) moves to the name when this phone reaches the same TV there,
+// so the remote it saves keeps working when the router changes the TV's
+// address. Any page may ask (CORS), and the id says nothing about the
+// token: it only tells two Otto TVs apart.
+func (s *Server) handleID(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	sum := sha256.Sum256([]byte("otto-tv id\n" + s.Pairing.Token()))
+	writeJSON(w, http.StatusOK, map[string]string{
+		"id":    hex.EncodeToString(sum[:8]),
+		"local": s.localAddr(),
+	})
 }
 
 func (s *Server) baseURL() string {

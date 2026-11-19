@@ -99,6 +99,40 @@ function takeTokenFromURL() {
   }
 }
 
+// --- The TV's name ----------------------------------------------------------------
+
+// The QR code opens the TV by its address, which every phone can reach. The
+// TV also answers as otto-tv.local, a name that stays when the router
+// gives the TV a new address. When this phone reaches the same TV under
+// that name, the page moves there (token and all), so the remote saved on
+// the home screen keeps working. Not from the saved remote itself: leaving
+// its address would open a browser over it.
+function standalone() {
+  return navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+}
+
+async function moveToLocalName() {
+  if (DEMO || !token || standalone() || !/^\d+\.\d+\.\d+\.\d+$/.test(location.hostname)) return false;
+  try {
+    const here = await (await fetch('/api/id', { cache: 'no-store' })).json();
+    if (!here.local || !/^[a-z0-9.-]+\.local:\d+$/.test(here.local)) return false;
+    const stop = new AbortController();
+    const timer = setTimeout(() => stop.abort(), 1500);
+    let there;
+    try {
+      there = await (await fetch(`http://${here.local}/api/id`, { cache: 'no-store', signal: stop.signal })).json();
+    } finally {
+      clearTimeout(timer);
+    }
+    // Another Otto TV on the same network has another id.
+    if (!there || there.id !== here.id) return false;
+    location.replace(`http://${here.local}/#t=${token}`);
+    return true;
+  } catch {
+    return false; // this phone can't resolve .local names: stay on the address
+  }
+}
+
 // --- Texts ------------------------------------------------------------------------
 
 function applyTexts() {
@@ -455,7 +489,7 @@ function showRemote() {
     setStatus('demo');
   } else {
     setStatus('off');
-    connect();
+    moveToLocalName().then((moved) => { if (!moved) connect(); });
   }
 }
 

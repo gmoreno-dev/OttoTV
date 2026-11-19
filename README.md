@@ -84,6 +84,16 @@ open, with a few guesses before it changes. The pairing screen itself is only
 served to the TV, checked by address and Host header, so a web page can't
 reach it through DNS rebinding.
 
+**A name that stays: `otto-tv.local`.** Routers hand out addresses that
+change, and a remote saved on the phone's home screen under the old one
+stops working. So `otto-remote` also answers multicast DNS for
+`otto-tv.local` (`remote/mdns`: that one name, no service discovery;
+`otto-tv-2.local` and so on when another machine has it, kept between
+boots). The QR code still opens the TV by address, which every phone can
+reach; the page then checks whether this phone reaches the same TV under the
+name (`/api/id`) and moves there, so what gets saved is the name. Phones
+that can't resolve `.local` names stay on the address.
+
 **Live and installed systems behave the same.** The upstream installer only
 copies the system image, kernel, initrd and recovery to disk, so on its own it
 would leave our files behind. Two things carry them over: our installer step
@@ -118,7 +128,9 @@ moving to a new upstream release is mostly bumping the ISO hash.
   phone's browser becomes a remote: directional pad, OK, back, home, volume,
   play/pause, a touchpad and a keyboard that types on the TV (accents
   included). Works on iPhone and Android, and can be added to the home
-  screen like an app. Holding a button repeats, like a real remote.
+  screen like an app. Holding a button repeats, like a real remote. The
+  saved remote finds the TV by name (`otto-tv.local`), so it keeps working
+  when the router gives the TV a new address.
 - **Laptop keyboards that make sense on a TV.** Esc goes back (there is no
   Back key on a PC keyboard, and Android TV apps rely on one), the Windows
   key goes home, Alt+F4 closes the app on screen (on the home screen it
