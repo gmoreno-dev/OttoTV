@@ -272,13 +272,22 @@ const BOOT_FN = 'function bootPose(n) {\n' +
 // eslint-disable-next-line no-new-func
 const bootPose = new Function(BOOT_FN + '\nreturn bootPose;')();
 
+// Otto TV: each tentacle swings around the middle of its root, whose end is
+// cut across the tentacle's slant, so a swing opened a sliver of background
+// between the body and the tentacle. A disc on the pivot, in the tentacle's
+// color and under the body, fills it; the side tentacles join the body at
+// its sides and don't need one.
+const ROOT_CAP = new Set(['bL', 'bR', 'f1', 'f2', 'f3', 'f4']);
+
 function bootArmsBack(transforms) {
   // back tentacles first, then the front ones (with suckers)
   let m = '';
   const order = ['bL', 'bR', 'sL', 'f1', 'f2', 'f3', 'f4', 'sR'];
   for (const key of order) {
-    const a = BOOT_ARMS.find((x) => x.key === key);
-    m += '<g transform="' + transforms[key] + '">' + P(T(a.g), a.fill) + (a.suck ? P(SK(a.g), COL.suck) : '') + '</g>';
+    const i = BOOT_ARMS.findIndex((x) => x.key === key);
+    const a = BOOT_ARMS[i];
+    const cap = ROOT_CAP.has(key) ? P(circ(BOOT_PIVOTS[i][0], BOOT_PIVOTS[i][1], AW0 * 0.62), a.fill) : '';
+    m += '<g transform="' + transforms[key] + '">' + cap + P(T(a.g), a.fill) + (a.suck ? P(SK(a.g), COL.suck) : '') + '</g>';
   }
   return m;
 }

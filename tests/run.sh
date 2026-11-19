@@ -425,8 +425,8 @@ expect "installer: desktop without BlissOS" "" \
 	"$(grep -i -e 'label="[^"]*bliss' -e 'blissos_logo' -e 'readme' "$inst/root/.jwmrc"
 	grep -i '^\(Name\|GenericName\|Icon\)=.*bliss' "$inst/root/Desktop/calamares.desktop"
 	for f in "$inst/root/Desktop"/*; do [ "${f##*/}" = calamares.desktop ] || echo "$f"; done)"
-expect "installer: Otto's wallpaper over upstream's" "same" \
-	"$(cmp -s "$inst/usr/share/backgrounds/blissified_09.png" "$ROOT/iso/otto/installer/wallpaper.png" && echo same)"
+expect "installer: Otto's wallpaper over upstream's, tiled" "same|WallpaperMode=tile|tile" \
+	"$(cmp -s "$inst/usr/share/backgrounds/blissified_09.png" "$ROOT/iso/otto/installer/wallpaper.png" && echo same)|$(grep '^WallpaperMode=' "$inst/root/.config/pcmanfm/default/settings.conf")|$(sed -n 's/.*<Background type="\([a-z]*\)".*/\1/p' "$inst/root/.jwmrc")"
 expect "installer: QML step list (the widget one aborts in that build)" "sidebar: qml,left|yes" \
 	"$(grep '^sidebar:' "$cal/branding/otto/branding.desc")|$([ -f "$cal/branding/otto/calamares-sidebar.qml" ] && echo yes)"
 

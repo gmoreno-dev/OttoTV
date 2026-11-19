@@ -280,6 +280,7 @@ otto_patch_installer() {
 		-e 's|label="Install BlissOS"|label="Instalar o Otto TV"|' \
 		-e 's|/etc/bliss/blissos_logo.svg|/etc/otto/icon.png|g' \
 		-e '/label="README"/d' \
+		-e 's|<Background type="[a-z]*">|<Background type="tile">|' \
 		"$root/root/.jwmrc" 2>/dev/null
 	sed -i -e 's|^Exec=.*|Exec=/usr/bin/bash -c "/usr/bin/aaropa-calamares grub"|' \
 		-e 's|^Name=.*|Name=Instalar o Otto TV|' \
@@ -287,10 +288,13 @@ otto_patch_installer() {
 		-e 's|^Icon=.*|Icon=/etc/otto/icon.png|' \
 		"$root/root/Desktop/calamares.desktop" 2>/dev/null
 	rm -f "$root/root/Desktop/HOW_TO_USE.png" "$root/root/Desktop/readme.desktop"
-	# Its wallpaper: Otto's, over every image its settings could point at.
+	# Its wallpaper: Otto's tile, over every image its settings could point
+	# at, tiled (with a TV plugged in, the desktop spans both screens).
 	for f in "$root"/usr/share/backgrounds/*.png; do
 		[ -f "$f" ] && cp "$inst/wallpaper.png" "$f" 2>/dev/null
 	done
+	sed -i 's/^WallpaperMode=.*/WallpaperMode=tile/' \
+		"$root/root/.config/pcmanfm/default/settings.conf" 2>/dev/null
 	return 0
 }
 

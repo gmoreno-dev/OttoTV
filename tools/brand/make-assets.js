@@ -116,14 +116,15 @@ async function installer(browser) {
 }
 
 async function installerWallpaper(browser) {
-  // The installer's little desktop (behind the installer window, and on
-  // screen for the seconds before it opens).
+  // The installer's little desktop. A tile, repeated: with a TV plugged in,
+  // that desktop spans the laptop and the TV, and a centered picture got cut
+  // between them. Two small Ottos per tile, half a tile apart.
+  const otto = (x, y) =>
+    '<svg viewBox="30 40 140 140" width="96" height="96" style="position:absolute;left:' + x + 'px;top:' + y + 'px;filter:grayscale(1) brightness(1.5);opacity:0.11">' +
+    G.bootOtto(0) + '</svg>';
   const html =
-    '<div style="width:1920px;height:1080px;position:relative;overflow:hidden;background:' + BG + ';' +
-    'background-image:radial-gradient(1200px 820px at 82% 8%, rgba(242,178,92,0.20), rgba(242,178,92,0.06) 52%, rgba(242,178,92,0) 78%);' +
-    'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px">' +
-    '<svg viewBox="30 40 140 140" width="420" height="420">' + G.bootOtto(0) + '</svg>' +
-    '<p style="margin:0;font-size:72px;font-weight:800;line-height:1;letter-spacing:-0.03em">Otto TV</p></div>';
+    '<div style="width:400px;height:400px;position:relative;overflow:hidden;background:' + BG + '">' +
+    otto(52, 52) + otto(252, 252) + '</div>';
   await render(browser, html, path.join(ROOT, 'iso/otto/installer/wallpaper.png'), { opaque: true });
 }
 
