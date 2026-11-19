@@ -9,7 +9,9 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.drawable.AdaptiveIconDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.LayerDrawable;
 import android.provider.Settings;
 
 import java.text.Collator;
@@ -100,7 +102,7 @@ final class Apps {
             String pkg = ri.activityInfo.packageName;
             ComponentName cn = new ComponentName(pkg, ri.activityInfo.name);
             CharSequence label = ri.loadLabel(pm);
-            Drawable bannerArt = ri.activityInfo.loadBanner(pm);
+            Drawable bannerArt = banner(ri.activityInfo.loadBanner(pm));
             Drawable iconArt = ri.loadIcon(pm);
             Bitmap banner = bannerArt == null ? null : draw(bannerArt, bw, bh);
             Bitmap icon = iconArt == null ? null : draw(iconArt, is, is);
@@ -118,6 +120,31 @@ final class Apps {
         } catch (RuntimeException | OutOfMemoryError e) {
             return null; // one broken app shouldn't take the home screen down
         }
+    }
+
+    /**
+     * A banner as the app means it. Some apps (F-Droid) ship theirs as an
+     * adaptive icon with 16:9 layers: drawn as an icon, it comes out as a
+     * zoomed-in oval, so the layers are drawn as they are, unmasked. A square
+     * adaptive icon given as a banner would come out stretched: no banner
+     * then, and the card shows the app's icon and name instead.
+     */
+    static Drawable banner(Drawable d) {
+        if (!(d instanceof AdaptiveIconDrawable)) {
+            return d;
+        }
+        AdaptiveIconDrawable a = (AdaptiveIconDrawable) d;
+        Drawable bg = a.getBackground();
+        Drawable fg = a.getForeground();
+        Drawable ref = fg != null && fg.getIntrinsicWidth() > 0 ? fg : bg;
+        if (ref == null || ref.getIntrinsicWidth() <= 0 || ref.getIntrinsicHeight() <= 0
+                || ref.getIntrinsicWidth() < ref.getIntrinsicHeight() * 1.4f) {
+            return null;
+        }
+        if (bg == null) {
+            return fg;
+        }
+        return fg == null ? bg : new LayerDrawable(new Drawable[] {bg, fg});
     }
 
     static Bitmap draw(Drawable d, int w, int h) {

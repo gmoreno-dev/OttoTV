@@ -732,7 +732,11 @@ public class HomeActivity extends Activity implements AppMenu.Listener {
             case KeyEvent.KEYCODE_DPAD_LEFT:
             case KeyEvent.KEYCODE_DPAD_RIGHT:
                 if (down) {
+                    String before = focusState();
                     move(code);
+                    if (!before.equals(focusState())) {
+                        Sfx.move(this, code); // like Android's own widgets: only when the focus moved
+                    }
                 }
                 return true;
             case KeyEvent.KEYCODE_DPAD_CENTER:
@@ -787,6 +791,7 @@ public class HomeActivity extends Activity implements AppMenu.Listener {
     private void onLongPress() {
         enterHeld = false;
         handler.removeCallbacks(longPress);
+        Sfx.click(this);
         if (screen == GRID) {
             openMenuFrom(GRID, gridIdx);
         } else if (zone == FAV) {
@@ -1000,6 +1005,7 @@ public class HomeActivity extends Activity implements AppMenu.Listener {
     }
 
     void select() {
+        Sfx.click(this);
         if (menu.shown()) {
             menuAction(menuOpt);
             return;
@@ -1437,7 +1443,13 @@ public class HomeActivity extends Activity implements AppMenu.Listener {
             View f = getCurrentFocus();
             return "safe/" + (f instanceof android.widget.Button ? ((android.widget.Button) f).getText() : "");
         }
-        return screen + "/" + zone + "/" + (screen == GRID ? gridIdx : zone == FAV ? favIdx : zone == APPS ? appIdx : heroIdx)
+        return focusState();
+    }
+
+    /** Where the focus is: screen, row, card, menu option, moving. */
+    private String focusState() {
+        return screen + "/" + zone + "/" + (screen == GRID ? gridIdx : screen == MORE ? moreIdx
+                : zone == FAV ? favIdx : zone == APPS ? appIdx : heroIdx)
                 + (menu.shown() ? "/menu" + menuOpt : "") + (moving ? "/moving" : "");
     }
 }

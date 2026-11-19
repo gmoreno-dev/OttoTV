@@ -212,3 +212,21 @@ func TestLaptopScreenKeyShowsANotice(t *testing.T) {
 		t.Errorf("got %v", got)
 	}
 }
+
+func TestPhonePanelOpensOverAnything(t *testing.T) {
+	// No key reaches the launcher from the phone's button, so the panel
+	// opens over the launcher too; an open panel closes (toggle).
+	for _, top := range []string{"com.stremio.one", app} {
+		a, calls := fakeAndroid(top, true)
+		a.App = app
+		a.Do(TogglePanel)
+		if fmt.Sprint(*calls) != "[am start -n app.ottotv.connect/.home.PanelActivity --ez toggle true]" {
+			t.Errorf("%s: got %v", top, *calls)
+		}
+	}
+	b, calls := fakeAndroid("com.stremio.one", true)
+	b.Do(TogglePanel)
+	if len(*calls) != 0 {
+		t.Errorf("no app: got %v", *calls)
+	}
+}

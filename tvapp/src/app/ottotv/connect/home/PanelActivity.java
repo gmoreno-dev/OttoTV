@@ -44,6 +44,8 @@ import app.ottotv.connect.R;
  */
 public class PanelActivity extends Activity {
     static final String EXTRA_FOCUS = "focus";
+    /** Sent by otto-remote for the phone's Panel button: closes an open panel. */
+    static final String EXTRA_TOGGLE = "toggle";
     static final float LEFT = 1120;
     static final float TOP = 54;
     static final float WIDTH = 704;
@@ -74,6 +76,8 @@ public class PanelActivity extends Activity {
     private Remote.Status status = Remote.last;
     private boolean laptop;
     private int focus = -1;
+    /** The sound output was picked with the arrows since the focus came to it. */
+    private boolean soundPicked;
     private int halfCol = PanelItem.WIFI;
     private boolean detailsShown;
     private boolean closing;
@@ -104,6 +108,11 @@ public class PanelActivity extends Activity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        // The phone's Panel button with the panel open: close it, like F2.
+        if (intent.getBooleanExtra(EXTRA_TOGGLE, false)) {
+            close();
+            return;
+        }
         // Ctrl+Alt+Del with the panel already open: go to Power.
         if ("power".equals(intent.getStringExtra(EXTRA_FOCUS)) && power != null) {
             focus(power);
@@ -316,12 +325,18 @@ public class PanelActivity extends Activity {
 
     // ---- Focus and keys ---------------------------------------------------------------
 
+    /** What the arrows can change: the focused item and the options picked in it. */
+    private String focusState() {
+        return focus + "/" + (sound == null ? "" : sound.selected) + "/" + (power == null ? "" : power.selected);
+    }
+
     private void focus(PanelItem it) {
         int i = items.indexOf(it);
         if (i < 0 || i == focus) {
             return;
         }
         focus = i;
+        soundPicked = false;
         if (it.kind == PanelItem.WIFI || it.kind == PanelItem.PHONE) {
             halfCol = it.kind;
         }
@@ -372,6 +387,7 @@ public class PanelActivity extends Activity {
         }
         boolean left = key == KeyEvent.KEYCODE_DPAD_LEFT;
         if (f.kind == PanelItem.SOUND) {
+            soundPicked = true;
             setAudio(left ? "tv" : "notebook");
         } else if (f.kind == PanelItem.WIFI && !left) {
             focus(phone);
@@ -394,7 +410,11 @@ public class PanelActivity extends Activity {
             case KeyEvent.KEYCODE_DPAD_LEFT:
             case KeyEvent.KEYCODE_DPAD_RIGHT:
                 if (down && !closing) {
+                    String before = focusState();
                     move(code);
+                    if (!before.equals(focusState())) {
+                        Sfx.move(this, code);
+                    }
                 }
                 return true;
             case KeyEvent.KEYCODE_DPAD_CENTER:
@@ -402,6 +422,7 @@ public class PanelActivity extends Activity {
             case KeyEvent.KEYCODE_NUMPAD_ENTER:
             case KeyEvent.KEYCODE_BUTTON_A:
                 if (first && !closing) {
+                    Sfx.click(this);
                     act(items.get(focus));
                 }
                 return true;
@@ -441,7 +462,11 @@ public class PanelActivity extends Activity {
     private void act(PanelItem it) {
         switch (it.kind) {
             case PanelItem.SOUND:
-                setAudio("notebook".equals(status == null ? "" : status.audio) ? "tv" : "notebook");
+                // OK after picking with the arrows confirms the pick (already
+                // made); OK alone switches to the other output.
+                if (!soundPicked) {
+                    setAudio("notebook".equals(status == null ? "" : status.audio) ? "tv" : "notebook");
+                }
                 break;
             case PanelItem.SCREEN:
                 setScreen(!it.on);

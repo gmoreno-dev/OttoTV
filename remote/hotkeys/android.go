@@ -71,6 +71,12 @@ func (a *Android) Do(act Action) {
 		a.openOver(".home.ShortcutsActivity")
 	case QuickPanel:
 		a.openOver(".home.PanelActivity")
+	case TogglePanel:
+		if a.App != "" {
+			if _, err := a.run("am", "start", "-n", a.App+"/.home.PanelActivity", "--ez", "toggle", "true"); err != nil {
+				log.Printf("hotkeys: quick panel: %v", err)
+			}
+		}
 	}
 }
 

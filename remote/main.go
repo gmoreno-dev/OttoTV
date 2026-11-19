@@ -135,28 +135,19 @@ func main() {
 		srv.Laptop = laptop
 		go laptop.Watch(ctx, 10*time.Second)
 	}
-	// init-hooks.sh sets this property once the sound goes to the TV.
-	srv.Audio = func() string {
-		cctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-		defer cancel()
-		if out, err := exec.CommandContext(cctx, "getprop", "hal.audio.out.hdmi").Output(); err == nil &&
-			strings.TrimSpace(string(out)) != "" {
-			return "tv"
-		}
-		if srv.Laptop != nil {
-			return "notebook"
-		}
-		return ""
-	}
+	srv.Audio = func() string { return sys.Audio(srv.Laptop != nil) }
 
+	// Shortcuts carried out with Android's tools: from the keyboard (below)
+	// and the phone's Panel button.
+	android := &hotkeys.Android{App: *app, Notify: srv.Notify}
+	if srv.Keys != nil {
+		android.Keys = srv.Keys
+	}
+	if srv.Laptop != nil {
+		android.Laptop = laptop
+	}
+	srv.Panel = func() { android.Do(hotkeys.TogglePanel) }
 	if *useHotkeys {
-		android := &hotkeys.Android{App: *app, Notify: srv.Notify}
-		if srv.Keys != nil {
-			android.Keys = srv.Keys
-		}
-		if srv.Laptop != nil {
-			android.Laptop = laptop
-		}
 		w := &hotkeys.Watcher{
 			SysDir: "/sys/class/input",
 			DevDir: "/dev/input",

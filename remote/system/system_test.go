@@ -70,15 +70,19 @@ func newAndroid(t *testing.T) (*Android, *fakeAndroid) {
 func TestSoundToTheTV(t *testing.T) {
 	a, f := newAndroid(t)
 	f.props[propTV] = "pcmC0D3p"
+	f.props[propPrimary] = "0"
 	if err := a.SetAudio("tv"); err != nil {
 		t.Fatal(err)
 	}
-	want := "[setprop hal.audio.primary.hdmi 1 setprop hal.audio.out.hdmi pcmC0D3p pkill audioserver]"
+	want := "[setprop hal.audio.out.hdmi pcmC0D3p setprop hal.audio.primary.hdmi 1 pkill audioserver]"
 	if fmt.Sprint(f.calls) != want {
 		t.Errorf("calls %v", f.calls)
 	}
 	if b, _ := os.ReadFile(filepath.Join(a.State, "audio")); string(b) != "tv\n" {
 		t.Errorf("choice saved as %q", b)
+	}
+	if got := a.Audio(true); got != "tv" {
+		t.Errorf("Audio() = %q", got)
 	}
 }
 
@@ -90,15 +94,66 @@ func TestSoundToTheLaptop(t *testing.T) {
 	if err := a.SetAudio("notebook"); err != nil {
 		t.Fatal(err)
 	}
-	if f.props[propHDMI] != "" || f.props[propPrimary] != "" || f.calls[len(f.calls)-1] != "pkill audioserver" {
-		t.Errorf("props %v, calls %v", f.props, f.calls)
+	// 0, never empty: empty, the HAL goes by Android's routing, maybe HDMI.
+	if fmt.Sprint(f.calls) != "[setprop hal.audio.primary.hdmi 0 pkill audioserver]" {
+		t.Errorf("calls %v", f.calls)
 	}
 	if b, _ := os.ReadFile(filepath.Join(a.State, "audio")); string(b) != "notebook\n" {
 		t.Errorf("choice saved as %q", b)
 	}
 	// The TV's output is still known, to switch back.
-	if f.props[propTV] != "pcmC0D3p" {
+	if f.props[propTV] != "pcmC0D3p" || f.props[propHDMI] != "pcmC0D3p" {
 		t.Error("forgot the TV's output")
+	}
+	if got := a.Audio(true); got != "notebook" {
+		t.Errorf("Audio() = %q", got)
+	}
+}
+
+func TestSoundSwitchThatDidntTake(t *testing.T) {
+	a, f := newAndroid(t)
+	f.props[propTV] = "pcmC0D3p"
+	f.props[propPrimary] = "1"
+	run := a.Run
+	a.Run = func(name string, args ...string) ([]byte, error) {
+		if name == "setprop" && args[0] == propPrimary {
+			return nil, nil // "succeeds" without changing anything
+		}
+		return run(name, args...)
+	}
+	if err := a.SetAudio("notebook"); err == nil || !strings.Contains(err.Error(), propPrimary) {
+		t.Errorf("err %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(a.State, "audio")); err == nil {
+		t.Error("saved a choice that didn't happen")
+	}
+	for _, c := range f.calls {
+		if strings.HasPrefix(c, "pkill") {
+			t.Error("restarted the sound for nothing")
+		}
+	}
+}
+
+func TestAudioNow(t *testing.T) {
+	a, f := newAndroid(t)
+	cases := []struct {
+		primary, hdmi string
+		laptop        bool
+		want          string
+	}{
+		{"1", "pcmC0D3p", true, "tv"},
+		{"true", "pcmC0D3p", false, "tv"},
+		{"0", "pcmC0D3p", true, "notebook"},
+		{"", "", true, "notebook"},   // no TV found at boot: the laptop's speakers
+		{"", "", false, ""},          // a desktop without the TV's sound
+		{"1", "", true, "notebook"},  // nothing to send to
+		{"0", "pcmC0D3p", false, ""}, // a desktop with the sound off the TV
+	}
+	for _, c := range cases {
+		f.props[propPrimary], f.props[propHDMI] = c.primary, c.hdmi
+		if got := a.Audio(c.laptop); got != c.want {
+			t.Errorf("%+v: got %q", c, got)
+		}
 	}
 }
 

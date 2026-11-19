@@ -155,11 +155,16 @@ public class ShortcutsActivity extends Activity {
             case KeyEvent.KEYCODE_DPAD_CENTER:
             case KeyEvent.KEYCODE_ENTER:
             case KeyEvent.KEYCODE_NUMPAD_ENTER:
+            case KeyEvent.KEYCODE_BUTTON_A:
+                if (first) {
+                    Sfx.click(this); // "Close", the one button here
+                    close();
+                }
+                return true;
             case KeyEvent.KEYCODE_BACK:
             case KeyEvent.KEYCODE_ESCAPE:
             case KeyEvent.KEYCODE_DEL:
             case KeyEvent.KEYCODE_F1:
-            case KeyEvent.KEYCODE_BUTTON_A:
             case KeyEvent.KEYCODE_BUTTON_B:
                 if (first) {
                     close();

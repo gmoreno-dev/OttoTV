@@ -273,3 +273,27 @@ func TestPhoneScreenToggleShowsANotice(t *testing.T) {
 		}
 	}
 }
+
+func TestPhoneOpensTheQuickPanel(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	s, _ := newTestServer(t)
+	opened := make(chan bool, 2)
+	s.Panel = func() { opened <- true }
+	c, _ := session(t, ctx, s)
+	wsjson.Write(ctx, c, Message{Type: "panel"})
+	select {
+	case <-opened:
+	case <-time.After(time.Second):
+		t.Fatal("panel not opened")
+	}
+	// Without the launcher's app, the phone is told.
+	s2, _ := newTestServer(t)
+	c2, _ := session(t, ctx, s2)
+	wsjson.Write(ctx, c2, Message{Type: "panel"})
+	var reply map[string]any
+	wsjson.Read(ctx, c2, &reply)
+	if reply["error"] != "no_panel" {
+		t.Errorf("reply %v", reply)
+	}
+}

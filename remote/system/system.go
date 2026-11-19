@@ -44,10 +44,13 @@ type Android struct {
 	ssidRead time.Time
 }
 
-// Where the sound goes is a pair of properties the x86 audio HAL reads when
-// audioserver starts (see otto_setup_audio in init-hooks.sh, which also
+// Where the sound goes is up to two properties the x86 audio HAL reads
+// when audioserver starts (see otto_setup_audio in init-hooks.sh, which also
 // leaves the TV's output in otto.audio.hdmi, and the choice in
-// <State>/audio for the next boot).
+// <State>/audio for the next boot): hal.audio.out.hdmi names the TV's
+// output, and hal.audio.primary.hdmi says whether to use it. The latter is
+// always set, to 1 or 0: left empty, the HAL falls back to Android's own
+// routing (hal/audio_hw.c, property_get_bool), which may pick HDMI too.
 const (
 	propHDMI    = "hal.audio.out.hdmi"
 	propPrimary = "hal.audio.primary.hdmi"
@@ -56,27 +59,26 @@ const (
 
 // SetAudio implements server.System.
 func (a *Android) SetAudio(to string) error {
+	want := "0"
 	switch to {
 	case "tv":
 		pcm := a.tvOutput()
 		if pcm == "" {
 			return server.ErrNoTVSound
 		}
-		if err := a.setprop(propPrimary, "1"); err != nil {
-			return err
-		}
 		if err := a.setprop(propHDMI, pcm); err != nil {
 			return err
 		}
+		want = "1"
 	case "notebook":
-		if err := a.setprop(propHDMI, ""); err != nil {
-			return err
-		}
-		if err := a.setprop(propPrimary, ""); err != nil {
-			return err
-		}
 	default:
 		return fmt.Errorf("unknown sound output %q", to)
+	}
+	if err := a.setprop(propPrimary, want); err != nil {
+		return err
+	}
+	if got := a.prop(propPrimary); got != want {
+		return fmt.Errorf("%s is %q after setting it to %q", propPrimary, got, want)
 	}
 	if a.State != "" {
 		tmp := filepath.Join(a.State, "audio.tmp")
@@ -111,6 +113,21 @@ func (a *Android) tvOutput() string {
 }
 
 var pcmRe = regexp.MustCompile(`^pcmC[0-9]+D[0-9]+p$`)
+
+// Audio is where the sound goes now: "tv", "notebook" (a laptop's own
+// speakers) or "" (a desktop without the TV's sound).
+func (a *Android) Audio(laptop bool) string {
+	switch strings.ToLower(a.prop(propPrimary)) {
+	case "1", "y", "yes", "on", "true":
+		if a.prop(propHDMI) != "" {
+			return "tv"
+		}
+	}
+	if laptop {
+		return "notebook"
+	}
+	return ""
+}
 
 var ssidRe = regexp.MustCompile(`(?:connected to "|SSID: ")([^"]+)"`)
 

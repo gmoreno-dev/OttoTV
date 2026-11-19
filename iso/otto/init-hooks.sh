@@ -99,27 +99,32 @@ otto_find_hdmi_pcm() {
 # hal.audio.out alone it parks the HDMI device and finds no output (-19).
 #
 # Unless the quick panel sent the sound to the laptop: otto-remote keeps
-# that choice in $OTTO_STATE/audio and switches by changing the same two
-# properties. otto.audio.hdmi keeps the TV's output either way, so the
-# panel can send the sound back to it.
+# that choice in $OTTO_STATE/audio and switches with the same properties.
+# hal.audio.primary.hdmi is then 0, never left empty: empty, the HAL goes by
+# Android's own routing (property_get_bool's default), which may be HDMI.
+# hal.audio.out.hdmi and otto.audio.hdmi keep the TV's output either way,
+# so the panel can send the sound back to it.
 OTTO_TV_SOUND_PROP=otto.audio.hdmi
 otto_setup_audio() {
-	local pcm
+	local pcm=""
 	if [ "${OTTO_AUDIO:-auto}" != "auto" ]; then
 		otto_log "audio: OTTO_AUDIO=$OTTO_AUDIO, not touching audio"
 		return 1
 	fi
-	if ! pcm=$(otto_find_hdmi_pcm); then
+	if pcm=$(otto_find_hdmi_pcm); then
+		setprop "$OTTO_TV_SOUND_PROP" "$pcm"
+		setprop hal.audio.out.hdmi "$pcm"
+	fi
+	if [ "$(cat "$OTTO_STATE/audio" 2>/dev/null)" = notebook ]; then
+		setprop hal.audio.primary.hdmi 0
+		otto_log "audio: sound on the laptop (quick panel)${pcm:+, TV on $pcm}"
+		return 1
+	fi
+	if [ -z "$pcm" ]; then
 		otto_log "audio: no display on HDMI, keeping the default output"
 		return 1
 	fi
-	setprop "$OTTO_TV_SOUND_PROP" "$pcm"
-	if [ "$(cat "$OTTO_STATE/audio" 2>/dev/null)" = notebook ]; then
-		otto_log "audio: display on HDMI ($pcm), sound kept on the laptop (quick panel)"
-		return 1
-	fi
 	setprop hal.audio.primary.hdmi 1
-	setprop hal.audio.out.hdmi "$pcm"
 	otto_log "audio: display on HDMI, routing sound to $pcm"
 }
 

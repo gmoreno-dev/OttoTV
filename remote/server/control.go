@@ -32,6 +32,7 @@ type Pointer interface {
 //	{"type":"click","button":"left"}
 //	{"type":"scroll","dy":1}
 //	{"type":"laptop"}                           laptop screen dark/lit
+//	{"type":"panel"}                            the TV's quick panel, open/closed
 type Message struct {
 	Type   string  `json:"type"`
 	Token  string  `json:"token,omitempty"`

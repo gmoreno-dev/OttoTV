@@ -25,7 +25,7 @@ const TEXTS = {
     tabButtons: 'Remote', tabTouchpad: 'Touchpad', tabKeyboard: 'Keyboard',
     skipped: 'Some characters can’t be typed on the TV and were skipped.',
     power: 'Sleep', dpad: 'Directional pad', up: 'Up', down: 'Down', left: 'Left', right: 'Right',
-    back: 'Back', home: 'Home', menu: 'Menu', volume: 'Volume',
+    back: 'Back', home: 'Home', menu: 'Menu', panel: 'Panel', volume: 'Volume',
     voldown: 'Volume down', volup: 'Volume up', mute: 'Mute', play: 'Play or pause',
     laptopOff: 'Laptop screen on. Tap to turn it off.', laptopOn: 'Laptop screen off. Tap to turn it on.',
     laptopIsOff: 'Laptop screen off', laptopIsOn: 'Laptop screen on',
@@ -53,7 +53,7 @@ const TEXTS = {
     tabButtons: 'Controle', tabTouchpad: 'Touchpad', tabKeyboard: 'Teclado',
     skipped: 'Alguns caracteres não dá para digitar na TV e foram pulados.',
     power: 'Suspender', dpad: 'Direcional', up: 'Cima', down: 'Baixo', left: 'Esquerda', right: 'Direita',
-    back: 'Voltar', home: 'Início', menu: 'Menu', volume: 'Volume',
+    back: 'Voltar', home: 'Início', menu: 'Menu', panel: 'Painel', volume: 'Volume',
     voldown: 'Diminuir volume', volup: 'Aumentar volume', mute: 'Silenciar', play: 'Reproduzir ou pausar',
     laptopOff: 'Tela do notebook acesa. Toque para apagar.', laptopOn: 'Tela do notebook apagada. Toque para acender.',
     laptopIsOff: 'Tela do notebook apagada', laptopIsOn: 'Tela do notebook acesa',
@@ -212,6 +212,7 @@ function showDemo(msg) {
   }
   const what = {
     key: () => (msg.key === 'ok' ? 'OK' : t(msg.key === 'backspace' ? 'erase' : msg.key)),
+    panel: () => t('panel'),
     text: () => `“${msg.text}”`,
     move: () => t('tabTouchpad'),
     click: () => t('tabTouchpad'),
@@ -508,6 +509,14 @@ function init() {
   $('#laptop-btn').addEventListener('click', () => {
     buzz();
     send({ type: 'laptop' });
+  });
+  const panelBtn = $('#panel-btn');
+  panelBtn.addEventListener('pointerdown', () => panelBtn.classList.add('pressed'));
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) =>
+    panelBtn.addEventListener(ev, () => panelBtn.classList.remove('pressed')));
+  panelBtn.addEventListener('click', () => {
+    buzz();
+    send({ type: 'panel' });
   });
   if (DEMO) setLaptop('on');
   bindTouchpad($('#pad'));

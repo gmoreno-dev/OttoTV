@@ -36,6 +36,9 @@ const (
 	ToggleLaptopScreen
 	Shortcuts
 	QuickPanel
+	// TogglePanel opens the quick panel or closes it, over anything: the
+	// phone's Panel button (no key reaches the launcher then).
+	TogglePanel
 )
 
 func (a Action) String() string {
@@ -50,6 +53,8 @@ func (a Action) String() string {
 		return "shortcuts"
 	case QuickPanel:
 		return "quick panel"
+	case TogglePanel:
+		return "quick panel (phone)"
 	}
 	return "none"
 }

@@ -94,7 +94,7 @@ first_caption="$(printf '%65s%s' '' 'Preparando o Otto TV pela primeira vez.')|$
 : >"$TMP/props"
 OTTO_ASOUND_CARDS="$TMP/cards" post_init
 expect "post_init: routes audio, sets the language and mirrors to the TV unasked" \
-	"setprop persist.sys.locale pt-BR|setprop persist.sys.display.enable_on_connect.external true|setprop otto.audio.hdmi pcmC1D3p|setprop hal.audio.primary.hdmi 1|setprop hal.audio.out.hdmi pcmC1D3p" \
+	"setprop persist.sys.locale pt-BR|setprop persist.sys.display.enable_on_connect.external true|setprop otto.audio.hdmi pcmC1D3p|setprop hal.audio.out.hdmi pcmC1D3p|setprop hal.audio.primary.hdmi 1" \
 	"$(paste -sd'|' "$TMP/props")"
 
 # The quick panel sent the sound to the laptop: it stays there, and the
@@ -102,13 +102,18 @@ expect "post_init: routes audio, sets the language and mirrors to the TV unasked
 echo notebook >"$OTTO_STATE/audio"
 : >"$TMP/props"
 OTTO_ASOUND_CARDS="$TMP/cards" otto_setup_audio
-expect "audio: sound kept on the laptop when the panel chose it" \
-	"1|setprop otto.audio.hdmi pcmC1D3p" "$?|$(paste -sd'|' "$TMP/props")"
+expect "audio: sound kept on the laptop when the panel chose it (0, not empty)" \
+	"1|setprop otto.audio.hdmi pcmC1D3p|setprop hal.audio.out.hdmi pcmC1D3p|setprop hal.audio.primary.hdmi 0" \
+	"$?|$(paste -sd'|' "$TMP/props")"
+: >"$TMP/props"
+OTTO_ASOUND_CARDS=/nonexistent otto_setup_audio
+expect "audio: on the laptop with no TV found either" \
+	"1|setprop hal.audio.primary.hdmi 0" "$?|$(paste -sd'|' "$TMP/props")"
 echo tv >"$OTTO_STATE/audio"
 : >"$TMP/props"
 OTTO_ASOUND_CARDS="$TMP/cards" otto_setup_audio
 expect "audio: back on the TV when the panel chose it" \
-	"0|setprop otto.audio.hdmi pcmC1D3p|setprop hal.audio.primary.hdmi 1|setprop hal.audio.out.hdmi pcmC1D3p" \
+	"0|setprop otto.audio.hdmi pcmC1D3p|setprop hal.audio.out.hdmi pcmC1D3p|setprop hal.audio.primary.hdmi 1" \
 	"$?|$(paste -sd'|' "$TMP/props")"
 rm -f "$OTTO_STATE/audio"
 
@@ -359,13 +364,13 @@ expect "bootcomplete: no pairing screen when the remote didn't start" \
 : >"$TMP/calls"
 (OTTO_EARLY_DONE=1 OTTO_ASOUND_CARDS="$TMP/cards" post_bootcomplete)
 expect "bootcomplete: a TV found late gets the sound" \
-	"otto.audio.hdmi=pcmC1D3p|hal.audio.primary.hdmi=1|hal.audio.out.hdmi=pcmC1D3p|pkill audioserver" \
+	"otto.audio.hdmi=pcmC1D3p|hal.audio.out.hdmi=pcmC1D3p|hal.audio.primary.hdmi=1|pkill audioserver" \
 	"$(paste -sd'|' "$TMP/calls")"
 echo notebook >"$OTTO_STATE/audio"
 : >"$TMP/calls"
 (OTTO_EARLY_DONE=1 OTTO_ASOUND_CARDS="$TMP/cards" post_bootcomplete)
 expect "bootcomplete: ...but not when the sound was sent to the laptop" \
-	"otto.audio.hdmi=pcmC1D3p" "$(paste -sd'|' "$TMP/calls")"
+	"otto.audio.hdmi=pcmC1D3p|hal.audio.out.hdmi=pcmC1D3p|hal.audio.primary.hdmi=0" "$(paste -sd'|' "$TMP/calls")"
 rm -f "$OTTO_STATE/audio"
 unset -f otto_setup_mirror otto_setup_ime otto_start_remote otto_wait_for_apps otto_setup_home otto_offer_pairing setprop getprop pkill log alsa_amixer
 # shellcheck source=iso/otto/init-hooks.sh

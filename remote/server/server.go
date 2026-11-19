@@ -40,6 +40,9 @@ type Server struct {
 	// "phone", "screen_off", "screen_on" or "closed" (with the app's
 	// package). May be nil.
 	Notify func(kind, app string)
+	// Panel opens the launcher's quick panel, or closes it when it is open
+	// (the phone's Panel button, like F2). May be nil.
+	Panel func()
 
 	phones  atomic.Int32
 	pairsAt atomic.Int64 // unix nanos of the last phone that connected
@@ -221,6 +224,14 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 			}
 			s.notify("screen_"+s.laptopState(), "")
 			wsjson.Write(ctx, c, map[string]string{"type": "laptop", "laptop": s.laptopState()})
+			continue
+		}
+		if m.Type == "panel" {
+			if s.Panel == nil {
+				wsjson.Write(ctx, c, map[string]string{"type": "error", "error": "no_panel"})
+			} else {
+				go s.Panel()
+			}
 			continue
 		}
 		if s.Keys == nil {

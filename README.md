@@ -4,7 +4,7 @@ Turn an old PC or laptop into a fast, plug-and-play Android TV for any TV.
 Flash a USB stick, plug the computer into the TV over HDMI, try it live, then
 install it.
 
-> Status: **v0.5.0, early development.** Tested on one machine so far:
+> Status: **v0.5.1, early development.** Tested on one machine so far:
 > [Acer HM77 / Ivy Bridge](docs/hardware/acer-hm77-ivybridge.md).
 
 **What it needs:** a 64-bit PC with SSE4.2 (Android 14 requires it: Intel
@@ -97,13 +97,15 @@ moving to a new upstream release is mostly bumping the ISO hash.
 - **Otto TV's own home screen.** Favorites up top (big banners, each
   tinted with the app's own color), recently used apps below, and every app
   a click away, sorted by name. Hold OK (or press Menu) on an app to pin,
-  move, uninstall or see its info. A Wi-Fi notice when the TV is offline,
+  move, uninstall or see its info, with Android's own navigation sounds.
+  A Wi-Fi notice when the TV is offline,
   the time, and the phone remote's status at a glance. Drawn natively at
   1080p with the design's Inter typeface; it replaces upstream's launcher
   (`OTTO_LAUNCHER=upstream` brings that one back). If it ever crashes twice
   in a row, it opens as a plain list of apps instead of leaving the TV on a
   black screen.
-- **Quick panel (F2, Ctrl+Alt+Del) and shortcuts (F1).** Over any app:
+- **Quick panel (F2, Ctrl+Alt+Del, the phone remote's Panel button) and
+  shortcuts (F1).** Over any app:
   where the sound goes (TV or laptop speakers, remembered across boots), the
   laptop screen, Wi-Fi, connecting another phone, suspend/restart/turn off
   and the system's details (CPU temperature and use, memory, IP, adb).
