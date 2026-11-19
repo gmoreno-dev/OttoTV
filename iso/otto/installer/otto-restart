@@ -73,16 +73,24 @@ say() {
 	} >>"$TTY" 2>/dev/null
 }
 
+# Calamares unmounted the new system before its last page, so it's on the
+# disk already; fsync on each disk also empties the disk's own cache. Then
+# the emergency restart, straight to the firmware. "reboot -f" (0.4.2) first
+# shuts every driver down, in order, and on the Acer that stopped with a
+# black screen and never restarted, after the stick came out. A global sync
+# is left out too: it would wait on the stick's mounts.
 restart() {
+	local disk
 	if [ -n "${OTTO_REBOOT:-}" ]; then
 		eval "$OTTO_REBOOT"
 		return
 	fi
-	sync
-	# -f: straight to the kernel, no shutdown scripts (nothing left to stop).
-	reboot -f
-	sleep 5
+	for disk in "$SYS"/block/sd* "$SYS"/block/nvme* "$SYS"/block/mmcblk* "$SYS"/block/vd*; do
+		[ -b "/dev/${disk##*/}" ] && timeout 10 sync "/dev/${disk##*/}" 2>/dev/null
+	done
 	echo b >/proc/sysrq-trigger
+	sleep 5
+	reboot -f
 }
 
 media=$(removable_media)
