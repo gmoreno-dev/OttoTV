@@ -9,6 +9,7 @@
 //   iso/boot/grub/themes/otto/logo.png        boot menu logo
 //   iso/otto/bootanimation.zip                Android boot animation
 //   iso/otto/installer/branding/otto/*.png    installer images
+//   iso/otto/installer/wallpaper.png          installer desktop
 //   tvapp/res/drawable*/{icon,banner}.png     "Connect phone" app
 //   remote/web/static/icon-*.png              phone remote (home screen icon)
 const fs = require('fs');
@@ -114,6 +115,18 @@ async function installer(browser) {
   }
 }
 
+async function installerWallpaper(browser) {
+  // The installer's little desktop (behind the installer window, and on
+  // screen for the seconds before it opens).
+  const html =
+    '<div style="width:1920px;height:1080px;position:relative;overflow:hidden;background:' + BG + ';' +
+    'background-image:radial-gradient(1200px 820px at 82% 8%, rgba(242,178,92,0.20), rgba(242,178,92,0.06) 52%, rgba(242,178,92,0) 78%);' +
+    'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px">' +
+    '<svg viewBox="30 40 140 140" width="420" height="420">' + G.bootOtto(0) + '</svg>' +
+    '<p style="margin:0;font-size:72px;font-weight:800;line-height:1;letter-spacing:-0.03em">Otto TV</p></div>';
+  await render(browser, html, path.join(ROOT, 'iso/otto/installer/wallpaper.png'), { opaque: true });
+}
+
 async function connectApp(browser) {
   // Legacy launcher icon: the adaptive icon's two layers, rounded. No mask
   // trims the adaptive margin here, so the front layer is drawn larger.
@@ -152,6 +165,7 @@ async function phoneRemote(browser) {
     await bootMenuLogo(browser);
     await bootAnimation(browser);
     await installer(browser);
+    await installerWallpaper(browser);
     await connectApp(browser);
     await phoneRemote(browser);
   } finally {

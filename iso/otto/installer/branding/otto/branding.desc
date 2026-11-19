@@ -8,7 +8,7 @@ welcomeExpandingLogo:   true
 windowExpanding:    normal
 windowSize: 800px,580px
 windowPlacement: center
-sidebar: widget
+sidebar: qml,left
 navigation: widget
 
 strings:

@@ -379,6 +379,8 @@ source "$ROOT/iso/scripts/9-otto"
 inst="$TMP/install"
 cp -r "$FIX/installer" "$inst"
 touch "$inst/root/Desktop/HOW_TO_USE.png" "$inst/root/Desktop/readme.desktop"
+mkdir -p "$inst/usr/share/backgrounds"
+echo bliss >"$inst/usr/share/backgrounds/blissified_09.png"
 payload="$TMP/payload"
 cp -r "$ROOT/iso/otto" "$payload"
 cp -r "$ROOT/iso/boot/grub/themes/otto" "$payload/installer/grub-theme"
@@ -416,13 +418,17 @@ expect "installer: opens in Portuguese" 'LANG=pt_BR.UTF-8 LANGUAGE=pt_BR calamar
 	"$(tail -n 1 "$inst/usr/bin/aaropa-calamares")"
 expect "installer: starts on GRUB, no bootloader question" "2" \
 	"$(grep -c 'aaropa-calamares grub"' "$inst/root/.jwmrc")"
-# (Its menu still runs /etc/bliss/reboot.sh: a path nobody sees.)
+# What shows: menu labels and icons, the desktop icon, the files on the
+# desktop. (Paths like /etc/bliss/reboot.sh or the wallpaper's file name,
+# now Otto's picture, don't.)
 expect "installer: desktop without BlissOS" "" \
-	"$(grep -i -e 'label="[^"]*bliss' -e 'bliss[a-z_0-9]*\.\(png\|svg\)' -e 'readme' "$inst/root/.jwmrc"
-	grep -i bliss "$inst/root/Desktop/calamares.desktop" "$inst/root/.config/pcmanfm/default/desktop-items-0.conf"
+	"$(grep -i -e 'label="[^"]*bliss' -e 'blissos_logo' -e 'readme' "$inst/root/.jwmrc"
+	grep -i '^\(Name\|GenericName\|Icon\)=.*bliss' "$inst/root/Desktop/calamares.desktop"
 	for f in "$inst/root/Desktop"/*; do [ "${f##*/}" = calamares.desktop ] || echo "$f"; done)"
-expect "installer: plain dark wallpaper" "wallpaper_mode=color|desktop_bg=#161b22|solid" \
-	"$(grep -e '^wallpaper_mode' -e '^desktop_bg' "$inst/root/.config/pcmanfm/default/desktop-items-0.conf" | paste -sd'|')|$(sed -n 's/.*<Background type="\([a-z]*\)".*/\1/p' "$inst/root/.jwmrc")"
+expect "installer: Otto's wallpaper over upstream's" "same" \
+	"$(cmp -s "$inst/usr/share/backgrounds/blissified_09.png" "$ROOT/iso/otto/installer/wallpaper.png" && echo same)"
+expect "installer: QML step list (the widget one aborts in that build)" "sidebar: qml,left|yes" \
+	"$(grep '^sidebar:' "$cal/branding/otto/branding.desc")|$([ -f "$cal/branding/otto/calamares-sidebar.qml" ] && echo yes)"
 
 cp "$cal/settings.conf" "$TMP/settings.once"
 otto_patch_installer "$inst" "$payload"

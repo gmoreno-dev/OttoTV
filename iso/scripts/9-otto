@@ -217,7 +217,9 @@ otto_hide_upstream_apps() {
 #  - Otto's branding and Portuguese, erase-the-disk preselected;
 #  - the installed boot menu: Otto TV's entries and theme, 5 s, the PC's
 #    UEFI boot entry named OttoTV;
-#  - its little desktop: no BlissOS logo, readme or wallpaper.
+#  - its little desktop: Otto's wallpaper, no BlissOS logo or readme;
+#  - a QML step list: this Calamares is a debug build whose widget sidebar
+#    aborts on an icon it can't load (that's branding.desc's business).
 # The cosmetic steps never stop an installation.
 # Usage: otto_patch_installer <installer root> <our otto folder>
 otto_patch_installer() {
@@ -278,7 +280,6 @@ otto_patch_installer() {
 		-e 's|label="Install BlissOS"|label="Instalar o Otto TV"|' \
 		-e 's|/etc/bliss/blissos_logo.svg|/etc/otto/icon.png|g' \
 		-e '/label="README"/d' \
-		-e 's|<Background type="[a-z]*">[^<]*</Background>|<Background type="solid">#161B22</Background>|' \
 		"$root/root/.jwmrc" 2>/dev/null
 	sed -i -e 's|^Exec=.*|Exec=/usr/bin/bash -c "/usr/bin/aaropa-calamares grub"|' \
 		-e 's|^Name=.*|Name=Instalar o Otto TV|' \
@@ -286,9 +287,10 @@ otto_patch_installer() {
 		-e 's|^Icon=.*|Icon=/etc/otto/icon.png|' \
 		"$root/root/Desktop/calamares.desktop" 2>/dev/null
 	rm -f "$root/root/Desktop/HOW_TO_USE.png" "$root/root/Desktop/readme.desktop"
-	sed -i -e 's/^wallpaper_mode=.*/wallpaper_mode=color\ndesktop_bg=#161b22/' \
-		-e '/^wallpaper=/d' \
-		"$root/root/.config/pcmanfm/default/desktop-items-0.conf" 2>/dev/null
+	# Its wallpaper: Otto's, over every image its settings could point at.
+	for f in "$root"/usr/share/backgrounds/*.png; do
+		[ -f "$f" ] && cp "$inst/wallpaper.png" "$f" 2>/dev/null
+	done
 	return 0
 }
 
