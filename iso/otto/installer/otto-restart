@@ -1,0 +1,105 @@
+#!/bin/sh
+# Otto TV: what the installer runs when it's done and the computer should
+# restart (finished.conf's restartNowCommand, set by iso/scripts/9-otto).
+#
+# The installer runs from RAM (otto_installer_to_ram in 9-otto), so this
+# works with the pen drive already out: the computer just restarts. While the
+# pen drive is in, a PC that boots from USB first would open the installer
+# again, so the screen asks for it to be taken out and the computer restarts
+# as soon as it is (or on Enter, to keep it in). Calamares unmounted the new
+# system before its last page: restarting at once loses nothing.
+#
+# The console font has no accents ("nao", not "não"); the text is written
+# around that.
+
+SYS=${OTTO_SYS:-/sys}
+MOUNTINFO=${OTTO_MOUNTINFO:-/proc/self/mountinfo}
+ART=${OTTO_ART:-/etc/otto/otto-ascii.txt}
+VT=${OTTO_VT:-8}
+TTY=${OTTO_TTY:-/dev/tty$VT}
+ENTER=${OTTO_ENTER:-/tmp/otto-restart-enter}
+
+# The sysfs folder of the disk the installer came from, if it can be taken
+# out (a USB stick or disk, a memory card). Nothing for a CD, a disk inside
+# the computer, or a copy in RAM (upstream's COPYTORAM).
+removable_media() {
+	local mm dev s
+	mm=$(awk '$5 == "/cdrom" { print $3; exit }' "$MOUNTINFO" 2>/dev/null)
+	[ -n "$mm" ] && [ -e "$SYS/dev/block/$mm" ] || return 0
+	dev=$(cd -P "$SYS/dev/block/$mm" && pwd) || return 0
+	# Ventoy maps the ISO through device-mapper: the stick is underneath.
+	for s in "$dev"/slaves/*; do
+		[ -e "$s" ] && dev=$(cd -P "$s" && pwd) && break
+	done
+	[ -e "$dev/partition" ] && dev=${dev%/*}
+	case "${dev##*/}" in sr* | loop* | ram* | zram* | dm-*) return 0 ;; esac
+	if [ "$(cat "$dev/removable" 2>/dev/null)" = 1 ]; then
+		echo "$dev"
+		return 0
+	fi
+	case "$dev" in */usb*) echo "$dev" ;; esac
+}
+
+# Otto and some lines of text, centered on our console.
+say() {
+	local size rows cols lines top pad spaces line
+	size=$(stty -F "$TTY" size 2>/dev/null)
+	rows=${size% *}
+	cols=${size#* }
+	[ -n "$size" ] || { rows=25 cols=80; }
+	lines=$(($(wc -l 2>/dev/null <"$ART" || echo 0) + 1 + $#))
+	top=$(((rows - lines) / 2))
+	{
+		# clear, cursor home, cursor hidden
+		printf '\033[2J\033[H\033[?25l'
+		while [ "$top" -gt 0 ]; do
+			echo
+			top=$((top - 1))
+		done
+		pad=$(((cols - 76) / 2))
+		[ "$pad" -ge 0 ] || pad=0
+		spaces=$(printf "%${pad}s" "")
+		if [ -f "$ART" ]; then
+			while IFS= read -r line; do
+				echo "$spaces$line"
+			done <"$ART"
+		fi
+		echo
+		for line in "$@"; do
+			pad=$(((cols - ${#line}) / 2))
+			[ "$pad" -ge 0 ] || pad=0
+			printf "%${pad}s%s\n" "" "$line"
+		done
+	} >>"$TTY" 2>/dev/null
+}
+
+restart() {
+	if [ -n "${OTTO_REBOOT:-}" ]; then
+		eval "$OTTO_REBOOT"
+		return
+	fi
+	sync
+	# -f: straight to the kernel, no shutdown scripts (nothing left to stop).
+	reboot -f
+	sleep 5
+	echo b >/proc/sysrq-trigger
+}
+
+media=$(removable_media)
+${OTTO_CHVT:-chvt} "$VT" 2>/dev/null
+if [ -n "$media" ] && [ -e "$media" ]; then
+	say "Tudo pronto! Pode tirar o pen-drive." \
+		"O computador reinicia sozinho assim que ele sair." \
+		"" \
+		"(Para reiniciar com ele, aperte Enter.)"
+	rm -f "$ENTER"
+	if [ -c "$TTY" ]; then
+		# Enter on this console. The reader goes away with the restart.
+		(read -r _ <"$TTY" && : >"$ENTER") &
+	fi
+	while [ -e "$media" ] && [ ! -e "$ENTER" ]; do
+		sleep 1
+	done
+fi
+say "Reiniciando..."
+restart

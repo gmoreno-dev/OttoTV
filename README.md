@@ -4,7 +4,7 @@ Turn an old PC or laptop into a fast, plug-and-play Android TV for any TV.
 Flash a USB stick, plug the computer into the TV over HDMI, try it live, then
 install it.
 
-> Status: **v0.4.1, early development.** Tested on one machine so far:
+> Status: **v0.4.2, early development.** Tested on one machine so far:
 > [Acer HM77 / Ivy Bridge](docs/hardware/acer-hm77-ivybridge.md).
 
 **What it needs:** a 64-bit PC with SSE4.2 (Android 14 requires it: Intel
@@ -37,9 +37,11 @@ USB stick
  │      │    │  the media's /boot folder, so that's where it finds us)
  │      │    └─ hides upstream's setup wizard and updater (whiteouts)
  │      └─ install mode: makes Calamares Otto TV's installer
+ │           ├─ runs it from RAM (the stick can come out any time after)
  │           ├─ 4 steps, Otto's branding, Portuguese, GRUB without asking
  │           ├─ installed boot menu: Otto's entries and theme
- │           └─ a step that copies /scripts and /otto to the installed system
+ │           ├─ a step that copies /scripts and /otto to the installed system
+ │           └─ at the end, asks for the stick to come out, then restarts
  └─ Android: /system/etc/init.sh calls
      post_init / post_bootcomplete
      (defined nowhere)                        ← ours: iso/otto/init-hooks.sh

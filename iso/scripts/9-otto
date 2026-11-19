@@ -7,8 +7,9 @@
 # it runs right before switch_root, after Android is mounted on /android or,
 # in install mode, after the installer is set up on /install.
 #
-# Everything here must only define functions: this file is sourced before
-# any of that is mounted.
+# Everything here only defines functions: this file is sourced before any of
+# that is mounted. One exception, at the end: in install mode the installer
+# is copied to RAM right away, before upstream mounts it.
 
 # To the console and to the kernel log, so `dmesg | grep otto` on the
 # running system shows what happened here too.
@@ -219,7 +220,9 @@ otto_hide_upstream_apps() {
 #    UEFI boot entry named OttoTV;
 #  - its little desktop: Otto's wallpaper, no BlissOS logo or readme;
 #  - a QML step list: this Calamares is a debug build whose widget sidebar
-#    aborts on an icon it can't load (that's branding.desc's business).
+#    aborts on an icon it can't load (that's branding.desc's business);
+#  - its last button restarts through otto-restart, which asks for the pen
+#    drive to be taken out first (see otto_installer_to_ram).
 # The cosmetic steps never stop an installation.
 # Usage: otto_patch_installer <installer root> <our otto folder>
 otto_patch_installer() {
@@ -295,6 +298,48 @@ otto_patch_installer() {
 	done
 	sed -i 's/^WallpaperMode=.*/WallpaperMode=tile/' \
 		"$root/root/.config/pcmanfm/default/settings.conf" 2>/dev/null
+
+	# The restart at the end ("Reiniciar agora" stays checked by default).
+	if mkdir -p "$root/usr/local/bin" &&
+		cp "$inst/otto-restart" "$root/usr/local/bin/otto-restart" 2>/dev/null; then
+		chmod 755 "$root/usr/local/bin/otto-restart"
+		cp "$inst/otto-ascii.txt" "$root/etc/otto/otto-ascii.txt" 2>/dev/null
+		sed -i 's|^restartNowCommand: .*|restartNowCommand: "/usr/local/bin/otto-restart"|' \
+			"$cal/modules/finished.conf" 2>/dev/null
+	fi
+	return 0
+}
+
+# Install mode: the installer (a small Linux in install.sfs, under 300 MB)
+# runs from RAM, so the pen drive can come out before the end without
+# freezing it, and the last screen can ask for it to come out
+# (otto-restart). Calamares, the desktop and the restart then never read
+# from the stick again; only the copy of the system, while installing, does.
+# Upstream's COPYTORAM=1 copies the whole stick, which needs its size in free
+# RAM; this copies the installer only, when the RAM can spare it and still
+# leave 1 GB to the installer. Otherwise it runs from the stick, as upstream's.
+# Upstream mounts install.sfs (setup_install) after sourcing this file, from
+# /mnt/$SRC/$INSTALL: the copy is bind-mounted there.
+otto_installer_to_ram() {
+	local src="${OTTO_MNT:-/mnt}/$SRC/$INSTALL"
+	local ram="${OTTO_RAMDIR:-/otto-ram}"
+	local copy size avail
+	[ -f "$src" ] || return 0
+	copy="$ram/${INSTALL##*/}"
+	size=$(du -m "$src" | awk '{ print $1 }')
+	avail=$(awk '/^MemAvailable:/ { print int($2 / 1024) }' "${OTTO_MEMINFO:-/proc/meminfo}")
+	if [ "${avail:-0}" -lt $((size + 1024)) ]; then
+		otto_msg "installer runs from the boot media (${avail:-?} MB of RAM free)"
+		return 0
+	fi
+	mkdir -p "$ram" &&
+		mount -t tmpfs -o "size=$((size + 16))m,mode=0755" otto-ram "$ram" || return 0
+	if cp "$src" "$copy" && mount --bind "$copy" "$src"; then
+		otto_msg "installer copied to RAM (${size} MB)"
+	else
+		otto_msg "WARNING: could not copy the installer to RAM"
+		umount "$ram" 2>/dev/null
+	fi
 	return 0
 }
 
@@ -329,3 +374,10 @@ post_detect() {
 	otto_expose_runtime
 	otto_hide_upstream_apps
 }
+
+# Install mode, before upstream mounts the installer (otto_installer_to_ram).
+# Upstream's COPYTORAM already puts everything in RAM.
+if [ -n "${INSTALL:-}" ] && [ -z "${RCVRY:-}" ] &&
+	{ [ -z "${COPYTORAM:-}" ] || [ "$COPYTORAM" = false ]; }; then
+	otto_installer_to_ram
+fi

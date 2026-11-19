@@ -1,4 +1,4 @@
-/* Otto TV: what the installer shows while it copies the system. Three
+/* Otto TV: what the installer shows while it copies the system. Four
  * slides (images from tools/brand/make-assets.js), 7 seconds each. */
 import QtQuick 2.15;
 import calamares.slideshow 1.0;
@@ -44,6 +44,16 @@ Presentation
         anchors.fill: parent
         Image {
             source: "slide3.png"
+            anchors.centerIn: parent
+            width: Math.min(parent.width - 48, 480)
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+        }
+    }
+    Slide {
+        anchors.fill: parent
+        Image {
+            source: "slide4.png"
             anchors.centerIn: parent
             width: Math.min(parent.width - 48, 480)
             fillMode: Image.PreserveAspectFit

@@ -384,6 +384,7 @@ echo bliss >"$inst/usr/share/backgrounds/blissified_09.png"
 payload="$TMP/payload"
 cp -r "$ROOT/iso/otto" "$payload"
 cp -r "$ROOT/iso/boot/grub/themes/otto" "$payload/installer/grub-theme"
+cp "$ROOT/art/brand/otto-ascii.txt" "$payload/installer/otto-ascii.txt"
 cal="$inst/etc/calamares"
 mods="$inst/usr/lib/x86_64-linux-gnu/calamares/modules"
 
@@ -430,9 +431,109 @@ expect "installer: Otto's wallpaper over upstream's, tiled" "same|WallpaperMode=
 expect "installer: QML step list (the widget one aborts in that build)" "sidebar: qml,left|yes" \
 	"$(grep '^sidebar:' "$cal/branding/otto/branding.desc")|$([ -f "$cal/branding/otto/calamares-sidebar.qml" ] && echo yes)"
 
+expect "installer: restarts through otto-restart, checked by default" \
+	'restartNowMode: user-checked|restartNowCommand: "/usr/local/bin/otto-restart"|yes|yes' \
+	"$(grep -e '^restartNowMode' -e '^restartNowCommand' "$cal/modules/finished.conf" | paste -sd'|')|$([ -x "$inst/usr/local/bin/otto-restart" ] && echo yes)|$(cmp -s "$inst/etc/otto/otto-ascii.txt" "$ROOT/art/brand/otto-ascii.txt" && echo yes)"
+
 cp "$cal/settings.conf" "$TMP/settings.once"
 otto_patch_installer "$inst" "$payload"
 expect "installer: patching twice changes nothing" "" "$(diff "$TMP/settings.once" "$cal/settings.conf")"
+
+# The installer in RAM: copied and bind-mounted where upstream mounts it from.
+# Usage: to_ram <MemAvailable in kB> [VAR=value...] (prints the mounts)
+to_ram() {
+	local kb=$1 r="$TMP/ram"
+	shift
+	rm -rf "$r"
+	mkdir -p "$r/mnt/iso"
+	head -c 3000000 /dev/urandom >"$r/mnt/iso/install.sfs"
+	printf 'MemAvailable:   %s kB\n' "$kb" >"$r/meminfo"
+	(
+		export OTTO_MNT="$r/mnt" SRC=iso OTTO_RAMDIR="$r/ram" OTTO_MEMINFO="$r/meminfo"
+		for v in "$@"; do export "${v?}"; done
+		# Sourced as the initrd does, with mount mocked.
+		# shellcheck disable=SC2016  # expanded by that bash
+		bash -c 'log=$1/log
+			mount() { echo "mount $*" >>"$log"; }
+			umount() { echo "umount $*" >>"$log"; }
+			source "$2"' _ "$r" "$ROOT/iso/scripts/9-otto" >/dev/null 2>&1
+	)
+	sed "s#$r/##g" "$r/log" 2>/dev/null | paste -sd'|'
+}
+expect "installer in RAM: copied, then mounted over the stick's file" \
+	"mount -t tmpfs -o size=19m,mode=0755 otto-ram ram|mount --bind ram/install.sfs mnt/iso/install.sfs|same" \
+	"$(to_ram 4000000 INSTALL=install.sfs)|$(cmp -s "$TMP/ram/ram/install.sfs" "$TMP/ram/mnt/iso/install.sfs" && echo same)"
+expect "installer in RAM: not with under 1 GB to spare" "" "$(to_ram 1000000 INSTALL=install.sfs)"
+expect "installer in RAM: not with upstream's COPYTORAM" "" "$(to_ram 4000000 INSTALL=install.sfs COPYTORAM=1)"
+expect "installer in RAM: not when booting the system" "" "$(to_ram 4000000)"
+
+# otto-restart, the installer's last step, under dash (its /bin/sh).
+# A USB stick, partition sdb1, holding the installer's /cdrom.
+rs="$TMP/restart"
+stick="$rs/sys/devices/pci0000:00/usb1/1-1/host6/block/sdb"
+mkdir -p "$stick/sdb1" "$rs/sys/dev/block" "$rs/sys/devices/virtual/block/dm-0/slaves"
+echo 1 >"$stick/removable"
+touch "$stick/sdb1/partition"
+ln -s ../../devices/pci0000:00/usb1/1-1/host6/block/sdb/sdb1 "$rs/sys/dev/block/8:17"
+# Ventoy: the ISO through device-mapper, over the same stick.
+ln -s ../../devices/virtual/block/dm-0 "$rs/sys/dev/block/253:0"
+ln -s ../../../../pci0000:00/usb1/1-1/host6/block/sdb/sdb1 "$rs/sys/devices/virtual/block/dm-0/slaves/sdb1"
+# A disk inside the computer.
+mkdir -p "$rs/sys/devices/pci0000:00/ata1/host0/block/sda/sda2"
+echo 0 >"$rs/sys/devices/pci0000:00/ata1/host0/block/sda/removable"
+touch "$rs/sys/devices/pci0000:00/ata1/host0/block/sda/sda2/partition"
+ln -s ../../devices/pci0000:00/ata1/host0/block/sda/sda2 "$rs/sys/dev/block/8:2"
+# Usage: restart_run <major:minor of /cdrom> (in the background; pid in $!)
+restart_run() {
+	rm -f "$rs/tty" "$rs/log"
+	echo "36 25 $1 / /cdrom ro,relatime - iso9660 /dev/x ro" >"$rs/mountinfo"
+	OTTO_SYS="$rs/sys" OTTO_MOUNTINFO="$rs/mountinfo" OTTO_ART="$ROOT/art/brand/otto-ascii.txt" \
+		OTTO_TTY="$rs/tty" OTTO_CHVT=: OTTO_ENTER="$rs/enter" \
+		OTTO_REBOOT="echo restarted >>'$rs/log'" dash "$ROOT/iso/otto/installer/otto-restart" &
+}
+# Usage: restart_wait <pid> (up to 5 s)
+restart_wait() {
+	local i
+	for i in 1 2 3 4 5 6 7 8 9 10; do
+		kill -0 "$1" 2>/dev/null || return 0
+		sleep 0.5
+	done
+	kill "$1" 2>/dev/null
+}
+restart_state() {
+	echo "$(grep -c 'Pode tirar o pen-drive' "$rs/tty" 2>/dev/null)|$(grep -c Reiniciando "$rs/tty" 2>/dev/null)|$(cat "$rs/log" 2>/dev/null)"
+}
+
+restart_run 8:17
+pid=$!
+sleep 1.5
+expect "restart: asks for the stick and waits" "1|0|" "$(restart_state)"
+mv "$stick" "$rs/gone"
+restart_wait "$pid"
+expect "restart: restarts once the stick is out" "1|1|restarted" "$(restart_state)"
+
+restart_run 8:17
+pid=$!
+restart_wait "$pid"
+expect "restart: stick already out, restarts at once" "0|1|restarted" "$(restart_state)"
+mv "$rs/gone" "$stick"
+
+restart_run 253:0
+pid=$!
+sleep 1.5
+expect "restart: finds the stick under Ventoy's device-mapper" "1|0|" "$(restart_state)"
+touch "$rs/enter"
+restart_wait "$pid"
+expect "restart: Enter restarts with the stick in" "1|1|restarted" "$(restart_state)"
+
+restart_run 8:2
+pid=$!
+restart_wait "$pid"
+expect "restart: installer from an inner disk, no question" "0|1|restarted" "$(restart_state)"
+restart_run 0:45
+pid=$!
+restart_wait "$pid"
+expect "restart: installer in RAM (COPYTORAM), no question" "0|1|restarted" "$(restart_state)"
 
 # Our boot entries, through grub-mkconfig's helpers (mocked).
 mkdir -p "$TMP/mkconfig"

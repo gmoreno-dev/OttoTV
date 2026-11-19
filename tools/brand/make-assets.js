@@ -130,13 +130,18 @@ async function installer(browser) {
   // Welcome page: Otto waving.
   await render(browser, '<svg viewBox="28 22 150 150" width="200" height="200">' + G.pose('wave') + '</svg>',
     path.join(dir, 'welcome.png'), { scale: 2 });
-  // Slides shown while installing (Installer-slide1..3).
+  // Slides shown while installing (Installer-slide1..3, and a fourth).
   const phone = '<g transform="rotate(12 146 62)">' + G.P(G.rrect(135, 43, 22, 38, 4.5), '#3A4352') +
     G.P(G.rrect(137.5, 46.5, 17, 29, 2.5), PANEL) + G.P(G.circ(146, 66, 3.4), '#F2B25C') + '</g>';
+  // Otto TV: a fourth one, for the end (iso/otto/installer/otto-restart).
+  const stick = '<g transform="rotate(12 146 62)">' + G.P(G.rrect(139.5, 41, 13, 14, 2), '#C9D1DB') +
+    G.P(G.rrect(142, 44.5, 3, 3, 0.6) + G.rrect(147, 44.5, 3, 3, 0.6), '#8A95A5') +
+    G.P(G.rrect(136, 53, 20, 30, 5), '#3A4352') + G.P(G.rrect(140, 58, 12, 9, 2.5), '#F2B25C') + '</g>';
   const slides = [
     ['0 0 64 64', G.LOGO, 'Seu computador antigo vai virar uma TV.'],
     ['28 22 150 150', G.pose('wave', { held: phone }), 'O celular vira controle e teclado.'],
     ['28 30 170 170', escKey(), 'Esc volta e a tecla Windows leva ao início.'],
+    ['28 22 150 150', G.pose('wave', { held: stick }), 'No fim, a tela avisa a hora de tirar o pen-drive.'],
   ];
   for (let i = 0; i < slides.length; i++) {
     const [vb, art, text] = slides[i];
