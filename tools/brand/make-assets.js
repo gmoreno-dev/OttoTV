@@ -6,6 +6,7 @@
 //   node tools/brand/make-assets.js        (needs Playwright with Chromium)
 //
 // Writes:
+//   art/brand/*.svg                           the brand's SVG files (from otto-geo.js)
 //   iso/boot/grub/themes/otto/logo.png        boot menu logo
 //   iso/otto/bootanimation.zip                Android boot animation
 //   iso/otto/installer/branding/otto/*.png    installer images
@@ -40,6 +41,37 @@ async function render(browser, html, out, { scale = 1, opaque = false } = {}) {
   await page.locator('#a').screenshot({ path: out, omitBackground: !opaque });
   await page.close();
   console.log('wrote', path.relative(ROOT, out));
+}
+
+// The brand's SVG files came from the design's generator, which used this
+// same geometry: they are rebuilt from it, keeping each file's <svg> line
+// (size, accessible name) and, in the banner, the background and the name.
+function brandSvgs() {
+  const logoAt = (tr, art) => '<g transform="' + tr + '">' + art + '</g>';
+  const files = {
+    'logo.svg': G.LOGO,
+    'icone-frente.svg': logoAt('translate(134.4 125.85) scale(3.8)', G.LOGO),
+    'icone-uma-cor.svg': logoAt('translate(134.4 125.85) scale(3.8)', G.logoMono('#FFFFFF')),
+    'otto-neutro.svg': G.pose('neutral'),
+    'otto-acenando.svg': G.pose('wave'),
+    'otto-comemorando.svg': G.pose('cheer'),
+    'otto-dormindo.svg': G.pose('sleep'),
+    'otto-pensando.svg': G.pose('think'),
+  };
+  for (const [name, art] of Object.entries(files)) {
+    const file = path.join(ROOT, 'art/brand', name);
+    const head = fs.readFileSync(file, 'utf8').match(/^[\s\S]*?<svg[^>]*>\n?/)[0];
+    fs.writeFileSync(file, head + art + '\n</svg>\n');
+    console.log('wrote', path.relative(ROOT, file));
+  }
+  const banner = path.join(ROOT, 'art/brand/banner-android-tv.svg');
+  const old = fs.readFileSync(banner, 'utf8');
+  const tr = 'translate(31 38.6) scale(1.5)';
+  const at = old.indexOf('<g transform="' + tr + '">');
+  const end = old.indexOf('</g>', at);
+  if (at < 0 || end < 0) throw new Error('banner-android-tv.svg: logo group not found');
+  fs.writeFileSync(banner, old.slice(0, at) + logoAt(tr, G.LOGO) + old.slice(end + 4));
+  console.log('wrote', path.relative(ROOT, banner));
 }
 
 const mark = (size) => '<svg viewBox="0 0 64 64" width="' + size + '" height="' + size + '">' + G.LOGO + '</svg>';
@@ -79,9 +111,11 @@ async function bootAnimation(browser) {
   console.log('wrote', path.relative(ROOT, out), G.BOOT_FRAMES + ' frames');
 }
 
-// Otto pressing a key (Installer-slide3), labeled Esc.
+// Otto pressing a key (Installer-slide3), labeled Esc. The tentacle starts
+// just left of the body's shaded side (was 130): its square-cut root showed
+// as a step on the shade.
 function escKey() {
-  const reach = [[[130, 104], [142, 102], [150, 108], [153, 118]], [[153, 118], [154, 127], [161, 131], [165, 127]]];
+  const reach = [[[127, 104], [142, 102], [150, 108], [153, 118]], [[153, 118], [154, 127], [161, 131], [165, 127]]];
   const key = G.P(G.rrect(140, 132, 52, 30, 7), '#9AA5B3') + G.P(G.rrect(140, 128, 52, 28, 7), '#E3E8EE') +
     '<text x="166" y="146.5" text-anchor="middle" font-family="Inter" font-weight="700" font-size="12" fill="#151A21">Esc</text>';
   const arm = G.P(G.taper(reach, G.AW0, 2.5 * G.K), G.COL.body) + G.P(G.suck(reach, G.AW0, 2.5 * G.K, 3), G.COL.suck);
@@ -163,6 +197,7 @@ async function phoneRemote(browser) {
 (async () => {
   const browser = await chromium.launch();
   try {
+    brandSvgs();
     await bootMenuLogo(browser);
     await bootAnimation(browser);
     await installer(browser);

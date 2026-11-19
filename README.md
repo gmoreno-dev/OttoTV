@@ -172,8 +172,9 @@ hand (Actions → CI → Run workflow).
 
 The images (boot menu, boot animation, installer, app icons) are committed.
 `node tools/brand/make-assets.js` and `python3 tools/brand/grub-theme.py`
-regenerate them from `art/brand` (the design's Otto, in SVG and JavaScript)
-and `art/fonts` (Inter, SIL OFL).
+regenerate them from `art/brand/otto-geo.js` (the design's Otto, drawn in
+JavaScript) and `art/fonts` (Inter, SIL OFL). The SVG files in `art/brand`
+are rebuilt from `otto-geo.js` too: change the geometry there, not in them.
 
 ## Boot options
 

@@ -54,10 +54,10 @@ function suck(segs, w0, w1, count) {
     let q = p[0];
     for (const c of p) if (Math.abs(c.u - u) < Math.abs(q.u - u)) q = c;
     const hw = halfWidth(w0, w1, q.u);
-    const r = Math.max(0.8, hw * 0.34);
+    const r = f(Math.max(0.8, hw * 0.34));
     const cx = q.x - q.nx * hw * 0.4;
     const cy = q.y - q.ny * hw * 0.4;
-    d += 'M' + f(cx - r) + ' ' + f(cy) + 'a' + f(r) + ' ' + f(r) + ' 0 1 0 ' + f(2 * r) + ' 0a' + f(r) + ' ' + f(r) + ' 0 1 0 ' + f(-2 * r) + ' 0';
+    d += 'M' + f(cx - r) + ' ' + f(cy) + 'a' + r + ' ' + r + ' 0 1 0 ' + f(2 * r) + ' 0a' + r + ' ' + r + ' 0 1 0 ' + f(-2 * r) + ' 0';
   }
   return d;
 }
@@ -92,8 +92,12 @@ function rrect(x, y, w, h, r) {
   return 'M' + f(x + r) + ' ' + f(y) + 'H' + f(x + w - r) + 'A' + r + ' ' + r + ' 0 0 1 ' + f(x + w) + ' ' + f(y + r) + 'V' + f(y + h - r) + 'A' + r + ' ' + r + ' 0 0 1 ' + f(x + w - r) + ' ' + f(y + h) + 'H' + f(x + r) + 'A' + r + ' ' + r + ' 0 0 1 ' + f(x) + ' ' + f(y + h - r) + 'V' + f(y + r) + 'A' + r + ' ' + r + ' 0 0 1 ' + f(x + r) + ' ' + f(y) + 'Z';
 }
 
+// The radius is rounded first and the arcs span exactly twice that: rounding
+// r and 2r apart (0.95 -> 1 and 1.9) drew two arcs a little apart, a pill
+// instead of a circle.
 function circ(cx, cy, r) {
-  return 'M' + f(cx - r) + ' ' + f(cy) + 'a' + f(r) + ' ' + f(r) + ' 0 1 0 ' + f(2 * r) + ' 0a' + f(r) + ' ' + f(r) + ' 0 1 0 ' + f(-2 * r) + ' 0Z';
+  const q = f(r);
+  return 'M' + f(cx - q) + ' ' + f(cy) + 'a' + q + ' ' + q + ' 0 1 0 ' + f(2 * q) + ' 0a' + q + ' ' + q + ' 0 1 0 ' + f(-2 * q) + ' 0Z';
 }
 
 const COL = {
@@ -122,10 +126,15 @@ const A = {
   f2: armW(55, 82, 44, 113, 0.65),
   f3: armW(65, 82, 76, 113, 0.65),
   f4: armW(75, 80, 89, 108, 0.7),
-  sideL: armW(33, 64, 14, 80, 0.8),
-  sideR: armW(87, 64, 106, 80, 0.8),
+  // Otto TV: the side tentacles start 2 units further in (were 33 and 87), so
+  // their roots, cut square across, stay inside the body instead of leaving a
+  // notch on its sides.
+  sideL: armW(35, 64, 14, 80, 0.8),
+  sideR: armW(85, 64, 106, 80, 0.8),
   wave: mapG([[[84, 62], [96, 60], [102, 50], [102, 38]], [[102, 38], [102, 32], [98, 28], [94, 31]]], W),
-  chin: mapG([[[37, 82], [22, 90], [14, 72], [26, 62]], [[26, 62], [33, 57], [43, 60], [44, 68]]], W),
+  // Otto TV: the root moved up into the body (was 37,82: its end showed under
+  // the body) and the curl ends lower (was 43,60 44,68: it bit into the left eye).
+  chin: mapG([[[38, 77], [22, 90], [14, 72], [26, 62]], [[26, 62], [32, 58], [39, 62], [41, 70]]], W),
   cB: [armC(52, 100, 30, 126, 0.9), armC(108, 100, 130, 126, 0.9)],
   cF: [armC(62, 104, 44, 134, 0.8), armC(74, 106, 62, 141, 0.7), armC(86, 106, 98, 141, 0.7), armC(98, 104, 116, 134, 0.8)],
   cU: [
@@ -177,6 +186,30 @@ function smile() {
 const T = (g, w0 = AW0, w1 = AW1) => taper(g, w0, w1);
 const SK = (g, w0 = AW0, w1 = AW1, n = 3) => suck(g, w0, w1, n);
 
+// Otto TV: a tentacle's root is cut square across it, and the front and back
+// ones meet the body's bottom at a slant, which left slivers of background
+// between them and the body. A disc on the root, in the tentacle's color and
+// under the body, fills those. The side tentacles join the body at its sides,
+// where a disc would bulge out: their roots sit inside the body instead.
+const ROOT_R = AW0 * 0.62;
+
+function tentacle(g, fill, opts = {}) {
+  const root = g[0][0];
+  const m = (opts.cap ? P(circ(root[0], root[1], ROOT_R), fill) : '') + P(T(g), fill) + (opts.suckers ? P(SK(g), COL.suck) : '');
+  return opts.transform ? '<g transform="' + opts.transform + '">' + m + '</g>' : m;
+}
+
+// sleep leans the body (rotated around the middle of its bottom). Each
+// tentacle moves with the point of the body it comes out of, so none of them
+// comes loose; they stay upright.
+const LEAN = -7;
+function leanShift(p) {
+  const a = LEAN * Math.PI / 180;
+  const x = p[0] - 100;
+  const y = p[1] - 124;
+  return 'translate(' + f(x * Math.cos(a) - y * Math.sin(a) - x) + ' ' + f(x * Math.sin(a) + y * Math.cos(a) - y) + ')';
+}
+
 // pose: neutral | wave | cheer | sleep | think
 // opts: look [dx,dy] for the pupils, sides (side tentacles), held (drawn under the waving tentacle), after (drawn last)
 function pose(name, opts = {}) {
@@ -192,26 +225,30 @@ function pose(name, opts = {}) {
     m += P(A.cB.map((g) => T(g, 10, 2.4)).join(''), COL.back);
     m += P(A.cF.map((g) => T(g, 10, 2.4)).join(''), COL.body);
     m += P(A.cF.map((g) => SK(g, 10, 2.4)).join(''), COL.suck);
+    // Otto TV: the raised tentacles come out from behind the body (they were
+    // drawn over it, and the right one's root cut a lighter stripe across the
+    // body's shaded side).
+    m += P(A.cU.map((g) => T(g, 11, 3)).join(''), COL.body);
+    m += P(A.cU.map((g) => SK(g, 11, 3)).join(''), COL.suck);
     m += bodyMarkup();
     m += S('M80 92Q86 82 92 92', COL.pupil, 4.6) + S('M108 92Q114 82 120 92', COL.pupil, 4.6);
     m += '<ellipse cx="77" cy="102" rx="6" ry="3.6" fill="' + COL.blush + '" opacity="0.5"></ellipse>';
     m += '<ellipse cx="123" cy="102" rx="6" ry="3.6" fill="' + COL.blush + '" opacity="0.5"></ellipse>';
     m += P('M90 100H110Q108 113 100 113Q92 113 90 100Z', COL.mouth);
     m += P('M95 108.5Q100 105 105 108.5Q103 112 100 112Q97 112 95 108.5Z', COL.tongue);
-    m += P(A.cU.map((g) => T(g, 11, 3)).join(''), COL.body);
-    m += P(A.cU.map((g) => SK(g, 11, 3)).join(''), COL.suck);
     return m;
   }
 
-  const front = [A.f1, A.f2, A.f3, A.f4];
   const sides = opts.sides || (name === 'wave' ? [A.sideL] : name === 'think' ? [A.sideR] : [A.sideL, A.sideR]);
-  m += P(T(A.backL) + T(A.backR), COL.back);
+  const arm = (g, fill, o = {}) => tentacle(g, fill, name === 'sleep' ? Object.assign({ transform: leanShift(g[0][0]) }, o) : o);
+  m += arm(A.backL, COL.back, { cap: true }) + arm(A.backR, COL.back, { cap: true });
   if (name === 'think') m += P(T(A.chin, AW0, 2.4 * K), COL.body);
-  m += P(front.concat(sides).map((g) => T(g)).join(''), COL.body);
-  m += P(front.map((g) => SK(g)).join(''), COL.suck);
+  if (sides.includes(A.sideL)) m += arm(A.sideL, COL.body);
+  for (const g of [A.f1, A.f2, A.f3, A.f4]) m += arm(g, COL.body, { cap: true, suckers: true });
+  for (const g of sides) if (g !== A.sideL) m += arm(g, COL.body);
 
   if (name === 'sleep') {
-    m += '<g transform="rotate(-7 100 124)">';
+    m += '<g transform="rotate(' + LEAN + ' 100 124)">';
     m += bodyMarkup();
     const cl = (e) => 'M' + f(e[0] - 7) + ' ' + f(e[1] + 1) + 'Q' + f(e[0]) + ' ' + f(e[1] + 6) + ' ' + f(e[0] + 7) + ' ' + f(e[1] + 1);
     m += S(cl(EYE_L) + cl(EYE_R), COL.pupil, 3.2);
@@ -231,9 +268,14 @@ function pose(name, opts = {}) {
     const c = W([59, 70.2]);
     const b = W([64.5, 71]);
     m += S('M' + f(a[0]) + ' ' + f(a[1]) + 'Q' + f(c[0]) + ' ' + f(c[1]) + ' ' + f(b[0]) + ' ' + f(b[1]), COL.smile, 2.2 * K);
-    // the curl of the chin tentacle passes in front of the face
+    // the curl of the chin tentacle passes in front of the face. Otto TV: it is
+    // the body's color, so over the face only its suckers showed, floating; a
+    // shadow under it, kept inside the body, shows where it is.
     const wj = jointWidth(A.chin, AW0, 2.4 * K);
-    m += P(taper([A.chin[1]], wj, 2.4 * K), COL.body);
+    const curl = taper([A.chin[1]], wj, 2.4 * K);
+    m += '<defs><clipPath id="otto-think-body"><path d="' + BODY + '"></path></clipPath></defs>';
+    m += '<g clip-path="url(#otto-think-body)">' + P(curl, COL.shade, ' transform="translate(1.4 1.6)"') + '</g>';
+    m += P(curl, COL.body);
     m += P(suck([A.chin[1]], wj, 2.4 * K, 2), COL.suck);
     m += P(circ(138, 66, 2.8) + circ(148, 50, 4.2) + circ(161, 30, 6), COL.ink);
     return m;
@@ -272,11 +314,8 @@ const BOOT_FN = 'function bootPose(n) {\n' +
 // eslint-disable-next-line no-new-func
 const bootPose = new Function(BOOT_FN + '\nreturn bootPose;')();
 
-// Otto TV: each tentacle swings around the middle of its root, whose end is
-// cut across the tentacle's slant, so a swing opened a sliver of background
-// between the body and the tentacle. A disc on the pivot, in the tentacle's
-// color and under the body, fills it; the side tentacles join the body at
-// its sides and don't need one.
+// Each tentacle swings around the middle of its root; the disc on the root
+// (see tentacle()) also fills what a swing opens between it and the body.
 const ROOT_CAP = new Set(['bL', 'bR', 'f1', 'f2', 'f3', 'f4']);
 
 function bootArmsBack(transforms) {
@@ -284,10 +323,8 @@ function bootArmsBack(transforms) {
   let m = '';
   const order = ['bL', 'bR', 'sL', 'f1', 'f2', 'f3', 'f4', 'sR'];
   for (const key of order) {
-    const i = BOOT_ARMS.findIndex((x) => x.key === key);
-    const a = BOOT_ARMS[i];
-    const cap = ROOT_CAP.has(key) ? P(circ(BOOT_PIVOTS[i][0], BOOT_PIVOTS[i][1], AW0 * 0.62), a.fill) : '';
-    m += '<g transform="' + transforms[key] + '">' + cap + P(T(a.g), a.fill) + (a.suck ? P(SK(a.g), COL.suck) : '') + '</g>';
+    const a = BOOT_ARMS.find((x) => x.key === key);
+    m += tentacle(a.g, a.fill, { cap: ROOT_CAP.has(key), suckers: a.suck, transform: transforms[key] });
   }
   return m;
 }
@@ -333,7 +370,11 @@ const LOGO =
   P(rrect(6, 30, 52, 26, 5), COL.lid) +
   P(rrect(9.5, 33.5, 45, 19, 2.5), COL.screen) +
   P(LAPTOP_BASE, COL.base) +
-  P(LOGO_ARMS, COL.body);
+  P(LOGO_ARMS, COL.body) +
+  // Otto TV: the right tentacle starts above the lid, over the shaded side,
+  // and its square-cut root showed there as a step. The shade goes back on top
+  // of it, down to the lid.
+  P('M44.2 26H47V30H44.2Z', COL.shade);
 
 // one color: separate shapes, so overlaps simply merge (no masks, works as an Android vector)
 const MONO_ARMS = taper(LG[0], 7, 2.6) + taper(LG[1], 7.4, 2.8) + taper(LG[2], 7.4, 2.8) + taper(LG[3], 7, 2.6);
