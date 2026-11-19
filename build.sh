@@ -158,7 +158,7 @@ tar -C "$STAGE" --format=ustar --owner=0 --group=0 --exclude=otto/user_app \
 	-cf "$UPDATE_TAR" scripts otto initrd.img
 log "Update archive: $UPDATE_TAR"
 # Its manifest, signed: what a release needs for TVs to update themselves
-# (README, Releases). Only with the signing key, which never leaves cache/.
+# (docs/technical.md, Updates from the TV). Only with the signing key, which never leaves cache/.
 MANIFEST="$OUT/otto-tv-update.json"
 rm -f "$MANIFEST"
 if [ -f "$CACHE/otto-update.key" ]; then

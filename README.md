@@ -1,382 +1,132 @@
 # Otto TV
 
-Turn an old PC or laptop into a fast, plug-and-play Android TV for any TV.
-Flash a USB stick, plug the computer into the TV over HDMI, try it live, then
-install it.
+**[English](#english)** | **[Português](#português)**
 
-> Status: **v0.7.1, early development.** Tested on one machine so far:
-> [Acer HM77 / Ivy Bridge](docs/hardware/acer-hm77-ivybridge.md).
+---
 
-**What it needs:** a 64-bit PC with SSE4.2 (Android 14 requires it: Intel
-Core i3/i5/i7 from 2008-2010 on, AMD from 2011 on; Core 2 Duo, older Pentiums
-and Athlon II/Phenom II won't boot), 2 GB of RAM (4 GB is comfortable) and an
-8 GB USB stick. Installing takes the whole disk.
+## English
 
-## How it works
+My TV is old and weak. Its "smart" side takes forever to open anything,
+freezes in the middle of an episode, and using YouTube on it is a pain. At
+the same time I had an old Acer laptop sitting around with nothing to do.
 
-Otto TV is built on [LineageOS TV x86](https://github.com/LineageOS-TV-x86)
-(Android TV 14 for PCs). Instead of rebuilding Android, `build.sh` remasters the
-upstream ISO: the 2+ GB system image is reused as is, and we only add small
-files that plug into extension points upstream already has.
+So I plugged the laptop into the TV and put Android TV on it. It worked,
+sort of: it took ages to boot, the sound came out of the wrong place, there
+was no remote, and half the screens expected a TV remote instead of a laptop.
+Otto TV is me fixing all of that, one thing at a time.
 
-```
-USB stick
- ├─ GRUB menu (/boot/grub/grub.cfg)          ← ours: menu, Otto theme, boot args
- ├─ /cmdline.txt                              ← ours: boot args for installed systems
- ├─ initrd (upstream's + a second archive)    ← ours: quiet /init with Otto in
- │                                               ASCII (tools/patch-initrd.sh)
- ├─ initrd: sources /scripts/* from the boot
- │   media and calls post_detect()
- │   (defined nowhere)                        ← ours: iso/scripts/9-otto
- │      ├─ live/installed boot:
- │      │    ├─ bind-mounts init.sh with our hooks prepended
- │      │    ├─ overlays /system/etc/user_app (add/remove first-boot apps)
- │      │    ├─ bind-mounts key layouts where Esc sends Back
- │      │    ├─ bind-mounts Otto's boot animation over LineageOS's
- │      │    │  (on a first boot, one that says it takes minutes)
- │      │    ├─ bind-mounts /otto on /boot/otto (Android only sees
- │      │    │  the media's /boot folder, so that's where it finds us)
- │      │    ├─ hides upstream's setup wizard, updater and home screen
- │      │    │  (whiteouts; Otto TV has its own)
- │      │    └─ starts the boot prefetcher (installed systems)
- │      └─ install mode: makes Calamares Otto TV's installer
- │           ├─ runs it from RAM (the stick can come out any time after)
- │           ├─ 4 steps, Otto's branding, Portuguese, GRUB without asking
- │           ├─ installed boot menu: Otto's entries and theme
- │           ├─ a step that copies /scripts and /otto to the installed system
- │           └─ at the end, asks for the stick to come out, then restarts
- └─ Android: /system/etc/init.sh calls
-     post_init / post_bootcomplete
-     (defined nowhere)                        ← ours: iso/otto/init-hooks.sh
-        ├─ redraws Otto in text once the GPU driver has the screen
-        ├─ first boot: "Almost ready" over the still-empty home screen
-        ├─ finds the HDMI output with a TV attached and routes audio to it
-        │  (unless the quick panel sent the sound to the laptop)
-        ├─ makes Otto TV's launcher the home screen, with its permissions
-        ├─ compiles installed apps ahead of time, once the boot settles
-        ├─ picks the on-screen keyboard (none with a physical keyboard)
-        └─ starts otto-remote, the phone remote   ← ours: remote/ (Go)
-```
+On my Acer (an old i5 with a hard drive) it now boots in about 40 seconds
+(it was 77) and the home screen runs smooth.
 
-### Phone remote
+### What it does
 
-```
- phone browser ──── http + WebSocket on the home Wi-Fi ────▶ otto-remote (root)
- (iPhone or Android,                                          ├─ serves the remote page
-  nothing to install)                                         ├─ pairs phones (QR or PIN)
-                                                              └─ /dev/uinput: virtual keyboard
- TV: "Connect phone" app ── WebView on 127.0.0.1 ──▶ QR code      and mouse that Android
-     (tvapp/)                                                     treats like USB ones
- TV: home screen ────────── /app/ on 127.0.0.1 ─────▶ sound, laptop screen, restart,
-     (tvapp/, home/)        (only this app: checked     system details, QR code
-                             by uid in /proc/net/tcp)
-```
+- Turns an old PC or laptop into an Android TV. Plug it into the TV over HDMI
+  and you're good.
+- Its own home screen: your favorites up top, every app one click away.
+- Your phone is the remote. Scan the QR code on the TV and that's it, no app
+  to install (iPhone and Android).
+- The sound goes to the TV on its own. Want the laptop speakers instead? One
+  click.
+- The laptop screen can go dark while you watch on the TV.
+- It updates itself: new versions show up in the quick panel (F2).
+- Comes with F-Droid, Aurora Store and DuckDuckGo.
 
-Android won't let an app type into other apps, but the boot hooks run as
-root, so `otto-remote` creates virtual input devices through uinput
-instead. To Android they look like a USB keyboard and mouse, so the remote
-works on every screen, system settings and dialogs included.
+### What you need
 
-Pairing needs someone in front of the TV: the QR code carries a 256-bit token
-in the URL fragment (browsers never send fragments to servers, so it stays
-out of logs), and the PIN alternative only works while the pairing screen is
-open, with a few guesses before it changes. The pairing screen itself is only
-served to the TV, checked by address and Host header, so a web page can't
-reach it through DNS rebinding.
+- A 64-bit PC or laptop from around 2010 or newer (Intel Core i3/i5/i7, or AMD
+  from 2011 on). Core 2 Duo and older won't work.
+- 2 GB of RAM (4 GB is better).
+- An 8 GB USB stick.
+- Heads up: installing erases the computer's disk.
 
-**A name that stays: `otto-tv.local`.** Routers hand out addresses that
-change, and a remote saved on the phone's home screen under the old one
-stops working. So `otto-remote` also answers multicast DNS for
-`otto-tv.local` (`remote/mdns`: that one name, no service discovery;
-`otto-tv-2.local` and so on when another machine has it, kept between
-boots). The QR code still opens the TV by address, which every phone can
-reach; the page then checks whether this phone reaches the same TV under the
-name (`/api/id`) and moves there, so what gets saved is the name. Phones
-that can't resolve `.local` names stay on the address.
+### How to try it
 
-**Live and installed systems behave the same.** The upstream installer only
-copies the system image, kernel, initrd and recovery to disk, so on its own it
-would leave our files behind. Two things carry them over: our installer step
-copies `/scripts` and `/otto` next to the installed kernel (where the
-installed initrd looks for `/scripts`), and the installer writes the first
-line of `/cmdline.txt` into the installed boot entries.
+There's no ISO to download yet: it's bigger than the 2 GB GitHub allows per
+file, and I'm still figuring out where to host it. For now you build it yourself
+([how](docs/technical.md#build)). Then:
 
-Nothing on the system image changes, so builds are small and fast, and
-moving to a new upstream release is mostly bumping the ISO hash.
+1. Write the ISO to a USB stick (Rufus, balenaEtcher or Ventoy).
+2. Plug the computer into the TV and boot from the stick.
+3. Try it as is. Liked it? Pick "Instalar o Otto TV neste computador" in the
+   boot menu (the menus are in Portuguese for now).
 
-## Features
+### Status
 
-- **Otto TV's own home screen.** Favorites up top (big banners, each
-  tinted with the app's own color), recently used apps below, and every app
-  a click away, sorted by name. Hold OK (or press Menu) on an app to pin,
-  move, uninstall or see its info, with Android's own navigation sounds.
-  A Wi-Fi notice when the TV is offline,
-  the time, and the phone remote's status at a glance. Drawn natively at
-  1080p with the design's Inter typeface; it replaces upstream's launcher
-  (`OTTO_LAUNCHER=upstream` brings that one back). If it ever crashes twice
-  in a row, it opens as a plain list of apps instead of leaving the TV on a
-  black screen.
-- **Quick panel (F2, Ctrl+Alt+Del, the phone remote's Panel button) and
-  shortcuts (F1).** Over any app:
-  where the sound goes (TV or laptop speakers, remembered across boots), the
-  laptop screen, Wi-Fi, connecting another phone, suspend/restart/turn off
-  and the system's details (CPU temperature and use, memory, IP, adb).
-  F1 lists the keyboard and mouse shortcuts, with the phone remote's QR
-  code. Small notices confirm what happened ("Celular conectado", the app
-  that Alt+F4 closed, the laptop screen going dark).
-- **Updates from the TV itself.** New releases show up in the quick panel;
-  one click downloads, checks and installs them, then a restart.
-  Signed, so only official releases install (see Releases below).
-- **Phone remote, no app to install.** Scan the QR code on the TV and the
-  phone's browser becomes a remote: directional pad, OK, back, home, volume,
-  play/pause, a touchpad and a keyboard that types on the TV (accents
-  included). Works on iPhone and Android, and can be added to the home
-  screen like an app. Holding a button repeats, like a real remote. The
-  saved remote finds the TV by name (`otto-tv.local`), so it keeps working
-  when the router gives the TV a new address.
-- **Laptop keyboards that make sense on a TV.** Esc goes back (there is no
-  Back key on a PC keyboard, and Android TV apps rely on one), the Windows
-  key goes home, Alt+F4 closes the app on screen (on the home screen it
-  opens the power options, like on a Windows desktop), Ctrl+Alt+Del opens
-  the power options, F1 the shortcuts and F2 the quick panel. The shortcuts come from the phone remote's service, which
-  reads the keyboard without taking keys away from Android. And the
-  on-screen keyboard stays out of the way when a physical keyboard is
-  plugged in. Android TV's keyboard ignores that setting on purpose, so
-  Otto TV switches to its own invisible keyboard, where Enter does what the TV
-  keyboard's "›" button does (screens like the Wi-Fi password only continue
-  on it). Upstream maps the big Enter key to the remote's OK, which is great
-  in menus and does nothing in a text field, so in text fields that key is
-  turned back into Enter; the remote's own OK is left alone. Remote-only
-  setups keep the TV keyboard. Key decisions are logged:
-  `adb logcat -s OttoKeyboard`.
-- **The laptop screen goes dark when you want.** A button on the phone
-  remote (and the laptop's own display Fn key, where it sends one) turns
-  the laptop's screen dark while the TV is the screen. The choice is saved,
-  and the screen always lights up again when no TV is connected, or while
-  the TV isn't showing the picture yet.
-- **The TV shows the picture as soon as it's plugged in.** Android 14 keeps
-  an HDMI screen dark until someone answers "Mirror to display?", asked on
-  the laptop's own screen (unseen with that screen dark or the lid closed).
-  Otto TV skips the question; `OTTO_MIRROR=ask` brings it back.
-- **Faster boots from a hard disk** (77 s to 42 s on the Acer). The boot
-  spent most of its time waiting for the disk: Android reads several
-  hundred MB in a scattered order, one seek each time. Once the home screen
-  is up, Otto TV notes which parts of the system image and `/data` the boot
-  read (in the order they sit on the disk); on the next boot the initrd
-  reads them in long sequential reads, holding the boot for up to 12
-  seconds while it reads alone on the disk, then alongside Android, with a
-  larger read-ahead while the boot lasts. SSDs are left alone. The list is
-  made again every three weeks; `OTTO_PREFETCH=off` turns it off.
-  Installed apps are compiled ahead of time once the boot settles, so their
-  first opens don't run interpreted code (`OTTO_COMPILE=off`).
-- **A home screen light on old GPUs.** Its backdrop is drawn once per color
-  into a GPU layer, and shadows and the focus glow are blurred once into
-  masks: frames copy them instead of computing five full-screen gradients
-  and blurs each time. Intel GPUs also get RP1 (their most efficient clock)
-  as their lowest one: they start each burst of work at the bottom, and a
-  200 ms animation ends before they ramp up (on the Acer: 8 ms of GPU per
-  frame at 350 MHz, 5 ms at 650).
-- **Compressed memory (zram) that actually turns on.** Upstream's zram
-  script dies on the `BOOT_IMAGE=(hd96)/kernel` GRUB adds to the command
-  line, so no machine got it. Otto TV fixes the script at boot; it matters
-  most on laptops with 2 to 4 GB of RAM.
-- **Ready when the home screen shows.** The Home key, the keyboard and the
-  phone remote come up first thing at boot complete, before upstream
-  installs its bundled apps (about 30 seconds in live mode). Our app is a
-  system app so it is there from the start.
-- **HDMI audio that just works.** Reads the HDMI jack sensors on every sound
-  card and routes sound to the one with a TV attached, retrying after boot in
-  case the TV was still waking up. No hard-coded device numbers, so it is
-  meant to cover Intel, AMD and Nvidia HDMI audio (verified on Intel so far).
-  See the
-  [investigation](docs/hardware/acer-hm77-ivybridge.md#the-hdmi-audio-investigation).
-- **Apps ready on first boot:** F-Droid (open-source app store), Aurora Store
-  (Play Store catalog, no Google account) and DuckDuckGo (browser). `apps.txt`
-  lists them by package name; the build fetches the current version from
-  F-Droid and records exact versions and hashes in `apps.lock`. Only
-  open-source apps whose licenses allow redistribution go in the ISO.
-- **Leaner first boot.** Drops upstream apps a TV doesn't need (root manager,
-  camera, game key mapper).
-- **Straight to the point on first boot.** Upstream's setup wizard (a
-  Bluetooth accessory search, then a LineageOS features page) is hidden.
-  Otto TV's own first-run screen asks for Wi-Fi when the TV is offline, then
-  shows the phone remote's QR code; Bluetooth pairing is one button away
-  instead of a step everyone has to sit through.
-- **Brazilian defaults.** Portuguese and `America/Sao_Paulo`, both
-  configurable in `config.env`.
-- **Compatibility mode** boot entry (software rendering) for GPUs the
-  hardware drivers can't drive.
-- **Fixes an upstream GRUB bug:** the "Disable Hardware Acceleration" toggle
-  never reached the kernel (`$hwacccel` typo, plus quoting that turned
-  multi-word options into one argument).
+Still early. So far it has only run on one machine: my Acer, hooked up to a
+Samsung TV. If you try it on yours, open an issue and tell me how it went,
+especially if something breaks.
 
-## Build
+### More details
 
-Needs Linux (WSL works) with `xorriso`, `curl`, `python3`, Go, a JDK and a
-slice of the Android SDK (for Otto TV's own app, about 400 KB: the home
-screen, the "Connect phone" screen and the physical-keyboard keyboard):
+How it works, how to build it, boot options and everything else:
+[docs/technical.md](docs/technical.md).
 
-```sh
-sudo apt install xorriso curl python3 golang openjdk-17-jdk-headless zip
-tools/setup-android-sdk.sh && export ANDROID_HOME=~/android-sdk
-./build.sh path/to/upstream.iso     # or set UPSTREAM_ISO_URL in config.env
-```
+Otto TV is built on [LineageOS TV x86](https://github.com/LineageOS-TV-x86),
+which builds on LineageOS, [Bliss OS](https://blissos.org) and Android-x86.
+I don't rebuild Android: I take their image and add my stuff on top. The
+bundled apps come from [F-Droid](https://f-droid.org).
 
-The TV app is built without Gradle (`tools/build-tv-app.sh`: aapt2, javac,
-d8, apksigner), and signed with a key kept in `cache/otto.keystore`, with
-its password in `cache/otto.keystore.pass`. Both are made on the first build
-and never leave `cache/` (ignored by git): updates of the app only install
-when they are signed with the same key, so keep a backup of the pair.
-`OTTO_PREBUILT=<dir>` takes `otto-remote` and `app.ottotv.connect.apk` from a
-folder instead of compiling them.
+---
 
-The result is `out/otto-<version>.iso`, its `.sha256` and its `.apps.lock`.
-Write the ISO to a USB stick with Rufus, balenaEtcher or `dd`, or copy it to a
-Ventoy stick.
+## Português
 
-The CI workflow lints and tests on every push, and builds the ISO when run by
-hand (Actions → CI → Run workflow).
+Minha TV é velha e fraca. A parte "smart" dela demora uma eternidade pra
+abrir qualquer coisa, trava no meio do episódio, e usar o YouTube nela é um
+sofrimento. Ao mesmo tempo, eu tinha um notebook Acer antigo parado, sem uso
+nenhum.
 
-The images (boot menu, boot animation, installer, app icons) are committed.
-`node tools/brand/make-assets.js` and `python3 tools/brand/grub-theme.py`
-regenerate them from `art/brand/otto-geo.js` (the design's Otto, drawn in
-JavaScript) and `art/fonts` (Inter, SIL OFL). The SVG files in `art/brand`
-are rebuilt from `otto-geo.js` too: change the geometry there, not in them.
+Aí liguei o notebook na TV e coloquei Android TV nele. Funcionou, mais ou
+menos: demorava muito pra ligar, o som saía no lugar errado, não tinha
+controle, e metade das telas esperava um controle remoto em vez de um
+notebook. O Otto TV sou eu arrumando tudo isso, uma coisa de cada vez.
 
-## Releases and updates from the TV
+No meu Acer (um i5 antigo com HD) ele liga em uns 40 segundos (antes eram
+77) e a tela inicial roda lisinha.
 
-Installed TVs update themselves from this repository's GitHub releases.
-Every few hours the TV app asks GitHub for the latest release and hands
-its manifest to `otto-remote`, which checks the signature; when the release
-is newer, the quick panel offers it ("Update to version X"). Choosing it
-streams the update archive from GitHub into `otto-remote`, which checks it
-against the manifest, installs it with the archive's own `update.sh` (the
-same one used over ADB) and asks for a restart. Live systems (the USB
-stick) don't update.
+### O que ele faz
 
-```
- TV app (tvapp/, home/Updates.java)          otto-remote (remote/update, root)
-  api.github.com: latest release ─────────▶  /app/update/check: signed? newer?
-  otto-tv-update.json (the manifest)
-  otto-tv-X-update.tar, streamed ──────────▶  /app/update/install: size and
-                                              SHA-256 as signed, then update.sh
-```
+- Transforma um PC ou notebook velho numa Android TV. Liga na TV pelo HDMI e
+  pronto.
+- Tela inicial própria: seus favoritos em cima, todos os apps a um clique.
+- O celular vira controle. Escaneia o QR code da TV e pronto, sem instalar
+  app nenhum (iPhone e Android).
+- O som vai pra TV sozinho. Prefere os alto-falantes do notebook? Um clique.
+- Dá pra apagar a tela do notebook enquanto você assiste na TV.
+- Ele se atualiza sozinho: as versões novas aparecem no painel rápido (F2).
+- Já vem com F-Droid, Aurora Store e DuckDuckGo.
 
-The manifest names the archive with its size and SHA-256, signed with
-Ed25519. The public key is built into `otto-remote` (`remote/update/key.go`);
-the private one is `cache/otto-update.key`, on the build machine only, so
-nobody else (GitHub included) can get a TV to install something.
+### O que você precisa
 
-**To publish a release:**
+- Um PC ou notebook 64 bits de 2010 pra cá (Intel Core i3/i5/i7, ou AMD de
+  2011 em diante). Core 2 Duo e mais antigos não funcionam.
+- 2 GB de RAM (4 GB é melhor).
+- Um pendrive de 8 GB.
+- Atenção: instalar apaga o disco do computador.
 
-1. Set `VERSION` in `config.env` (higher than the last release) and build.
-   With `cache/otto-update.key` present, the build signs the update:
-   `out/otto-tv-<version>-update.tar` and `out/otto-tv-update.json`.
-2. On GitHub, draft a new release with the tag `v<version>`, attach both
-   files and publish it. TVs pick it up within a few hours (or when the
-   quick panel opens).
+### Como testar
 
-`UPDATE_REPO` in `config.env` names the repository; empty turns updates off.
-Keep backups of `cache/otto-update.key` and of the app's signing key
-(`cache/otto.keystore` and `.pass`): without the first, TVs can't be
-updated from releases; without the second, the app can't be updated.
+Ainda não tem ISO pra baixar: ela passa dos 2 GB que o GitHub aceita por
+arquivo, e eu ainda tô vendo onde hospedar. Por enquanto você mesmo gera a
+sua ([como](docs/technical.md#build)). Depois:
 
-## Boot options
+1. Grava a ISO num pendrive (Rufus, balenaEtcher ou Ventoy).
+2. Liga o computador na TV e dá boot pelo pendrive.
+3. Testa direto do pendrive. Gostou? Escolhe "Instalar o Otto TV neste
+   computador" no menu de boot.
 
-Uppercase `VAR=value` pairs on the kernel command line become shell variables
-in Android's `init.sh`, which both upstream and our hooks read.
-`EXTRA_KERNEL_ARGS` in `config.env` sets them for the live menu and, through
-`/cmdline.txt`, for installed systems:
+### Status
 
-| Option            | Default             | Effect |
-|-------------------|---------------------|--------|
-| `OTTO_AUDIO`      | `auto`              | `off` skips HDMI audio detection |
-| `OTTO_LOCALE`     | `pt-BR`             | Default language (a language the user picks wins) |
-| `OTTO_MIRROR`     | `auto`              | `ask` keeps Android's "Mirror to display?" question (from the next boot) |
-| `OTTO_ESC`        | `back`              | `escape` keeps Esc as Esc |
-| `OTTO_IME`        | `auto`              | `tv` always uses the TV keyboard, `hard` never shows one |
-| `OTTO_REMOTE`     | `on`                | `off` doesn't start the phone remote (nor the keyboard shortcuts) |
-| `OTTO_SETUP`      | `ours`              | `wizard` keeps upstream's setup wizard |
-| `OTTO_LAUNCHER`   | `ours`              | `upstream` keeps upstream's home screen (and leaves the home screen choice alone) |
-| `OTTO_PREFETCH`   | `on`                | `off` doesn't read ahead what the boot needs |
-| `OTTO_COMPILE`    | `on`                | `off` doesn't compile installed apps ahead of time |
-| `OTTO_GPU`        | `auto`              | `off` keeps Intel GPUs' lowest clock as the floor (by default it is RP1) |
-| `SET_TZ_LOCATION` | `America/Sao_Paulo` | Time zone (upstream option) |
+Ainda no começo. Até agora só rodou numa máquina: o meu Acer, ligado numa TV
+Samsung. Se você testar no seu, abre uma issue e me conta como foi,
+principalmente se algo quebrar.
 
-To try one without rebuilding, press `e` on a menu entry, append it to the
-`linux` line and boot with Ctrl+X.
+### Mais detalhes
 
-## Development
+Como funciona, como gerar a ISO, opções de boot e o resto (em inglês):
+[docs/technical.md](docs/technical.md).
 
-```sh
-tests/run.sh
-```
-
-Covers HDMI detection against real device dumps, `post_init` with Android's
-commands mocked, keyboard detection and the on-screen keyboard choice, the
-Esc key layout patch, GRUB patching and rendering, the installer patch
-against the real upstream `settings.conf`, the installer job against a fake
-Calamares, the F-Droid helper, the TV app's Enter key logic, and the phone
-remote (`remote/`, `go test`:
-typing, held keys, pairing, the TV-only routes and a WebSocket session
-against a fake keyboard; the launcher's routes, who may call them, the
-sound switch and the shortcuts). The launcher is drawn by hand, so its
-layout math (`tvapp/test/HomeMathTest.java`) runs here too.
-
-`tools/device/input-test.sh` collects input diagnostics from a running box
-and tries the keyboard fixes live, without a new ISO.
-`tools/device/update.sh` updates an installed system to a new build over
-ADB, without reinstalling: the build writes `out/otto-<version>-update.tar`
-with just our files. `tools/device/baseline.sh` measures a box (boot time, RAM, app start times,
-home screen smoothness, CPU, storage and Wi-Fi), so every optimization is
-compared against numbers from the same machine; `baseline.sh video` measures
-what playback costs while a video plays. `tools/device/trace.sh` records a
-Perfetto trace of the home screen in use (`home`) or of a whole boot
-(`boot`, then `boot-done`), for ui.perfetto.dev or trace_processor.
-
-Debugging on a device goes through ADB over the network: enable developer
-options, rooted debugging and network debugging, then
-`adb connect <ip>:5555 && adb root`. Our hooks log to the kernel log
-(`adb shell dmesg | grep otto`) and to logcat (`adb logcat -s otto`).
-
-## Known gaps
-
-- **Installation:** first run on real hardware done (the Acer: BIOS, HDD),
-  and the installed system boots with our hooks. Measurements of installed
-  boots are next.
-- **App verification:** apps come over HTTPS from f-droid.org, picked through
-  F-Droid's v1 API. F-Droid recommends its signed index for fetching apps;
-  verifying against it is on the roadmap.
-- **The home screen is new in v0.5:** checked screen by screen against the
-  design off-device; its first run on the Acer is next.
-- **Wi-Fi and keyboard layout** are set by hand in Settings for now (Wi-Fi
-  passwords can be typed from the phone remote).
-- **The phone remote is new in v0.3** and its uinput side has only run in
-  tests so far (no uinput in CI): the first run on the Acer is next.
-- **Phone remote on plain HTTP:** traffic stays on the home network, but it
-  is not encrypted, so someone already on that Wi-Fi could read the token.
-  The TV's address can also change; a fixed `.local` name is next.
-- **Typing from the phone** goes through a US layout with Alt dead keys, so
-  Portuguese accents work in standard text fields; emoji and other scripts
-  are skipped (the phone says so).
-- **The laptop's own screen** can only be turned dark (its backlight), so
-  the GPU still draws for it. Switching the panel itself off while the
-  system boots (v0.3.7) crashed the GPU driver on the Acer (Ivy Bridge) and
-  left it rebooting in a loop, with no crash log. An "only the TV" mode
-  with `video=LVDS-1:d` on the kernel command line is still to be tried.
-- **Right mouse button as Back** isn't there yet: Esc, the phone and a
-  two-finger tap on the phone's touchpad cover it.
-- **Installed menu branding** still comes from upstream's installer.
-- **Old Intel Macs:** upstream also ships an HFS+ copy of the boot media for
-  Macs. libisofs 1.5.6 fails to lay it out next to the EFI partition once
-  files change ("GPT partitions overlap"), so the build drops it. PCs boot
-  through BIOS or UEFI as before; Macs that only boot from HFS+ won't.
-- **Release hosting:** the ISO is ~2.4 GB and GitHub release assets are capped
-  at 2 GB, so CI builds land as short-lived workflow artifacts for now.
-
-## Credits
-
-Built on [LineageOS TV x86](https://github.com/LineageOS-TV-x86), which builds
-on LineageOS, [Bliss OS](https://blissos.org) and Android-x86. Otto TV only adds
-boot-time configuration on top of their work. Bundled apps come from
-[F-Droid](https://f-droid.org) under their own open-source licenses.
+O Otto TV é feito em cima do
+[LineageOS TV x86](https://github.com/LineageOS-TV-x86), que por sua vez vem
+do LineageOS, do [Bliss OS](https://blissos.org) e do Android-x86. Eu não
+recompilo o Android: pego a imagem deles e coloco as minhas coisas por cima.
+Os apps que vêm junto são do [F-Droid](https://f-droid.org).
