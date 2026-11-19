@@ -203,8 +203,8 @@ unset -f setsid
 }
 : >"$TMP/calls"
 SETTINGS_VALUE=0 otto_setup_done
-expect "setup: marked as done at boot complete" \
-	"put device_provisioned 1|put user_setup_complete 1|put tv_user_setup_complete 1" \
+expect "setup: marked as done at boot complete, and named Otto TV" \
+	"put device_provisioned 1|put user_setup_complete 1|put tv_user_setup_complete 1|put device_name Otto TV|put bluetooth_name Otto TV" \
 	"$(paste -sd'|' "$TMP/calls")"
 : >"$TMP/calls"
 SETTINGS_VALUE=1 otto_setup_done
@@ -415,7 +415,7 @@ expect "installer: starts on GRUB, no bootloader question" "2" \
 expect "installer: desktop without BlissOS" "" \
 	"$(grep -i -e 'label="[^"]*bliss' -e 'bliss[a-z_0-9]*\.\(png\|svg\)' -e 'readme' "$inst/root/.jwmrc"
 	grep -i bliss "$inst/root/Desktop/calamares.desktop" "$inst/root/.config/pcmanfm/default/desktop-items-0.conf"
-	ls "$inst/root/Desktop" | grep -v -x calamares.desktop)"
+	for f in "$inst/root/Desktop"/*; do [ "${f##*/}" = calamares.desktop ] || echo "$f"; done)"
 expect "installer: plain dark wallpaper" "wallpaper_mode=color|desktop_bg=#161b22|solid" \
 	"$(grep -e '^wallpaper_mode' -e '^desktop_bg' "$inst/root/.config/pcmanfm/default/desktop-items-0.conf" | paste -sd'|')|$(sed -n 's/.*<Background type="\([a-z]*\)".*/\1/p' "$inst/root/.jwmrc")"
 
@@ -436,8 +436,9 @@ entries=$(sed "s#/etc/default/grub#$TMP/mkconfig/default-grub#" "$cal/scripts/10
 	pkgdatadir="$TMP/mkconfig" GRUB_DEVICE=/dev/sda1 grub_probe=true grub_tab="$(printf '\t')" bash)
 expect "installed menu: Otto TV and safe video, nothing else" "Otto TV|Otto TV em modo de vídeo seguro" \
 	"$(echo "$entries" | sed -n "s/^menuentry '\([^']*\)'.*/\1/p" | paste -sd'|')"
+# shellcheck disable=SC2016  # a literal $MODE
 expect "installed menu: safe video passes nomodeset" "1" \
-	"$(echo "$entries" | grep -c 'androidboot.mode=\$MODE nomodeset HWACCEL=0 ROOT=/dev/sda1')"
+	"$(echo "$entries" | grep -c -F 'androidboot.mode=$MODE nomodeset HWACCEL=0 ROOT=/dev/sda1')"
 
 # --- Boot animation (initrd hook) -----------------------------------------------
 
@@ -553,23 +554,27 @@ expect "keys: Esc becomes Back, everything else untouched" \
 	"key 1     BACK|key 2     1|key 158   BACK|# key 1 ESCAPE in a comment|key 111   FORWARD_DEL" \
 	"$(printf '%s\n' 'key 1     ESCAPE' 'key 2     1' 'key 158   BACK' \
 		'# key 1 ESCAPE in a comment' 'key 111   FORWARD_DEL' | otto_esc_to_back | paste -sd'|')"
-# Setup wizard: found wherever upstream keeps it, hidden with whiteouts.
+# Upstream's wizard and updater: found wherever upstream keeps them, hidden
+# with whiteouts, one overlay per folder.
 mkdir -p "$TMP/android/system/priv-app/LineageSetupWizard" \
 	"$TMP/android/system/priv-app/Settings" \
-	"$TMP/android/system/system_ext/priv-app/TvSetupWizard"
+	"$TMP/android/system/system_ext/priv-app/TvSetupWizard" \
+	"$TMP/android/system/system_ext/priv-app/Updater" \
+	"$TMP/android/system/system_ext/priv-app/TvSettingsTwoPanel"
 # shellcheck disable=SC2329  # mocks, called by otto_hide
 {
 	mknod() { echo "mknod ${1##*/}" >>"$TMP/calls"; }
 	mount() { echo "mount ${*: -1}" >>"$TMP/calls"; }
 }
 : >"$TMP/calls"
-OTTO_ANDROID="$TMP/android" otto_hide_setup_wizard >/dev/null
-expect "setup: wizards hidden, other system apps kept" \
-	"mknod LineageSetupWizard|mount $TMP/android/system/priv-app|mknod TvSetupWizard|mount $TMP/android/system/system_ext/priv-app" \
+OTTO_ANDROID="$TMP/android" otto_hide_upstream_apps >/dev/null
+expect "upstream apps: wizards and updater hidden, other system apps kept" \
+	"mknod LineageSetupWizard|mount $TMP/android/system/priv-app|mknod TvSetupWizard|mknod Updater|mount $TMP/android/system/system_ext/priv-app" \
 	"$(paste -sd'|' "$TMP/calls")"
 : >"$TMP/calls"
-OTTO_SETUP=wizard OTTO_ANDROID="$TMP/android" otto_hide_setup_wizard >/dev/null
-expect "setup: OTTO_SETUP=wizard keeps upstream's wizard" "" "$(cat "$TMP/calls")"
+OTTO_SETUP=wizard OTTO_ANDROID="$TMP/android" otto_hide_upstream_apps >/dev/null
+expect "upstream apps: OTTO_SETUP=wizard keeps the wizard, not the updater" \
+	"mknod Updater|mount $TMP/android/system/system_ext/priv-app" "$(paste -sd'|' "$TMP/calls")"
 unset -f mknod mount
 
 expect "keys: Esc with key flags still becomes Back" "key 1   BACK" \

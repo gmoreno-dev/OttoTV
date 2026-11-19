@@ -35,7 +35,7 @@ otto_detach() {
 }
 
 # ---- First-run setup ------------------------------------------------------------
-# Our initrd hook hides upstream's setup wizard (see otto_hide_setup_wizard).
+# Our initrd hook hides upstream's setup wizard (see otto_hide_upstream_apps).
 # Without a wizard nobody marks setup as done, and then Android TV ignores
 # the Home key and Settings locks developer options, so we mark it at boot
 # complete. (Up to 0.3.4 a background job did it earlier, from post_init;
@@ -49,6 +49,10 @@ otto_setup_done() {
 	settings put global device_provisioned 1
 	settings put secure user_setup_complete 1
 	settings put secure tv_user_setup_complete 1
+	# The name on the network, in Bluetooth and in Settings (the wizard would
+	# have asked). Only now, on first boot: a name the user picks later stays.
+	settings put global device_name "Otto TV"
+	settings put secure bluetooth_name "Otto TV"
 	otto_log "setup: marked as done"
 }
 

@@ -177,26 +177,32 @@ otto_hide() {
 	mount -t overlay -o "lowerdir=$layer:$dir" overlay "$dir"
 }
 
-# Upstream's setup wizard (LineageOS) opens before the home screen with a
-# Bluetooth accessory search and a LineageOS features page. Otto TV replaces
-# it: Wi-Fi and the phone come from our "Connect phone" screen, Bluetooth
-# pairing stays in Settings, and init-hooks.sh marks setup as done.
-# OTTO_SETUP=wizard on the kernel command line keeps upstream's wizard.
-otto_hide_setup_wizard() {
+# Upstream apps that speak for LineageOS instead of Otto TV, hidden with
+# whiteouts wherever upstream keeps them:
+#  - the setup wizard, which opens before the home screen with a Bluetooth
+#    accessory search and a LineageOS features page. Otto TV replaces it:
+#    Wi-Fi and the phone come from our "Connect phone" screen, Bluetooth
+#    pairing stays in Settings, and init-hooks.sh marks setup as done.
+#    OTTO_SETUP=wizard on the kernel command line keeps it;
+#  - the LineageOS updater, which would offer LineageOS builds. Otto TV
+#    updates with its own files (tools/device/update.sh, then a new ISO).
+otto_hide_upstream_apps() {
 	local dir app found
-	if [ "${OTTO_SETUP:-ours}" = wizard ]; then
-		otto_msg "setup: OTTO_SETUP=wizard, keeping upstream's wizard"
-		return 0
-	fi
 	local sys="${OTTO_ANDROID:-/android}/system"
+	[ "${OTTO_SETUP:-ours}" = wizard ] &&
+		otto_msg "setup: OTTO_SETUP=wizard, keeping upstream's wizard"
 	for dir in "$sys/priv-app" "$sys/system_ext/priv-app" "$sys/product/priv-app"; do
 		found=""
-		for app in "$dir"/*SetupWizard*; do
-			[ -e "$app" ] && found="$found ${app##*/}"
+		for app in "$dir"/*SetupWizard* "$dir"/Updater; do
+			[ -e "$app" ] || continue
+			case "${app##*/}" in
+			*SetupWizard*) [ "${OTTO_SETUP:-ours}" = wizard ] && continue ;;
+			esac
+			found="$found ${app##*/}"
 		done
 		[ -n "$found" ] || continue
 		# shellcheck disable=SC2086  # one word per app folder
-		otto_hide "$dir" $found && otto_msg "setup: hid$found"
+		otto_hide "$dir" $found && otto_msg "hid$found"
 	done
 }
 
@@ -315,5 +321,5 @@ post_detect() {
 	otto_boot_animation
 	otto_keylayouts
 	otto_expose_runtime
-	otto_hide_setup_wizard
+	otto_hide_upstream_apps
 }
