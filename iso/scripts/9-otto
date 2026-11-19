@@ -83,6 +83,37 @@ otto_fix_zram() {
 		otto_msg "zram: fixed upstream's setup script"
 }
 
+# Protected video (Netflix, Prime Video...) on CPUs without MOVBE. Upstream's
+# Widevine service was built for CPUs that have it (Intel from Haswell, 2013,
+# on) and dies with SIGILL on older ones the first time an app asks for a
+# license. native/movbe does those few instructions in software: it goes
+# into that service with LD_PRELOAD, set in a patched copy of the service's
+# .rc, and the library is layered into vendor/lib64 where the service's
+# linker looks. Nothing changes on CPUs with MOVBE. OTTO_MOVBE=off skips it.
+otto_movbe_rc() {
+	awk '
+		{ print }
+		/^service[ \t].*android\.hardware\.drm-service\.widevine/ { print "    setenv LD_PRELOAD libotto_movbe.so" }
+	'
+}
+
+otto_movbe() {
+	local vendor="${OTTO_ANDROID:-/android}/system/vendor" rc patched
+	local lib="/mnt/$SRC/otto/lib"
+
+	[ "${OTTO_MOVBE:-auto}" = off ] && return 0
+	grep -qw movbe "${OTTO_PROC:-/proc}/cpuinfo" 2>/dev/null && return 0
+	[ -f "$lib/libotto_movbe.so" ] && [ -d "$vendor/lib64" ] || return 0
+	rc=$(grep -l 'android\.hardware\.drm-service\.widevine' "$vendor"/etc/init/*.rc 2>/dev/null | head -n 1)
+	[ -n "$rc" ] || return 0
+	grep -q LD_PRELOAD "$rc" && return 0
+	patched="${OTTO_TMP:-/tmp}/otto-widevine.rc"
+	otto_movbe_rc <"$rc" >"$patched" &&
+		mount --bind "$patched" "$rc" &&
+		mount -t overlay -o "lowerdir=$lib:$vendor/lib64" overlay "$vendor/lib64" &&
+		otto_msg "widevine: MOVBE done in software (this CPU has none)"
+}
+
 # Our app (home screen, pairing screen, physical keyboard IME) goes in as a
 # system app, so it is there from the first moment instead of after
 # upstream installs its user apps. Upstream's home screen, if it lives in
@@ -470,6 +501,7 @@ post_detect() {
 	otto_system_apps
 	otto_user_apps
 	otto_fix_zram
+	otto_movbe
 	otto_boot_animation
 	otto_keylayouts
 	otto_expose_runtime

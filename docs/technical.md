@@ -62,6 +62,7 @@ for them.
 | `tools/` | Build scripts, and `tools/device/` with scripts that run on a TV over ADB |
 | `tests/` | `tests/run.sh` runs everything |
 | `art/` | Otto's drawing and fonts; the images are generated from here |
+| `native/movbe/` | MOVBE in software, for Widevine on older CPUs (C, no libc) |
 | `docs/hardware/` | Notes on each machine it has run on |
 
 ## The phone remote
@@ -201,6 +202,18 @@ that question. The laptop's screen can go dark (its backlight) from the
 phone or the quick panel, and it always lights up again when no TV is
 showing the picture.
 
+**Protected video (Netflix, Prime Video...).** These apps play through
+Widevine, Google's DRM. On a PC it's the software version (L3), so services
+cap the quality, usually around 480p. Upstream's Widevine service was built
+for CPUs from 2013 on: on older ones (the Acer's Ivy Bridge) it crashed with
+"illegal instruction" the moment an app asked for a license, so nothing with
+protected video could play. The missing instruction is MOVBE (load or store
+with the bytes reversed), used in 7 places, none of them in decoding video.
+`native/movbe` is a small library that does those in software: the initrd
+loads it into that one service, only on CPUs without MOVBE. Upstream has no
+Google Play services either, and some apps need them; and Netflix may refuse
+devices that aren't certified anyway.
+
 **First boot.** Upstream's setup wizard is hidden. Otto TV asks for Wi-Fi if
 the TV is offline, then shows the phone's QR code. Bluetooth pairing is one
 button away.
@@ -256,6 +269,7 @@ with Ctrl+X.
 | `OTTO_PREFETCH` | `on` | `off` turns off the boot read-ahead |
 | `OTTO_COMPILE` | `on` | `off` doesn't compile apps ahead of time |
 | `OTTO_GPU` | `auto` | `off` leaves Intel's GPU clock alone |
+| `OTTO_MOVBE` | `auto` | `off` doesn't fix Widevine on CPUs without MOVBE |
 | `SET_TZ_LOCATION` | `America/Sao_Paulo` | Time zone (upstream's option) |
 
 ## Tests and device tools
@@ -302,6 +316,8 @@ to `/data/misc/otto/remote.log`.
 - **Wi-Fi and keyboard layout** are set in Android's settings for now.
 - **App downloads** come over HTTPS from f-droid.org; checking them against
   F-Droid's signed index is on the list.
+- **Streaming apps:** Widevine is L3 (lower quality), there are no Google
+  Play services, and Max stays on its logo for reasons still unknown.
 - **Old Intel Macs** that only boot from HFS+ won't boot (the build has to
   drop that copy of the boot files).
 

@@ -18,7 +18,7 @@ jobs:
       - name: Lint shell scripts
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq shellcheck mksh
+          sudo apt-get install -y -qq shellcheck mksh qemu-user
           shellcheck -x -P SCRIPTDIR/.. build.sh tools/*.sh tests/run.sh
           shellcheck -s sh iso/scripts/9-otto iso/otto/init-hooks.sh iso/otto/installer/otto-restart tools/device/*.sh
 

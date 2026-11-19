@@ -840,6 +840,49 @@ otto_fix_zram_script <"$FIX/upstream-init.zram.sh" >"$TMP/android/system/vendor/
 OTTO_ANDROID="$TMP/android" OTTO_TMP="$TMP" otto_fix_zram >/dev/null
 expect "zram: an already fixed script is left alone" "" "$(cat "$TMP/calls")"
 
+# Widevine on CPUs without MOVBE: LD_PRELOAD in a patched .rc, and the
+# library layered into vendor/lib64. Only where the CPU lacks MOVBE.
+mkdir -p "$TMP/android/system/vendor/etc/init" "$TMP/android/system/vendor/lib64" \
+	"$TMP/media/otto/lib" "$TMP/mvproc"
+: >"$TMP/media/otto/lib/libotto_movbe.so"
+wvrc="$TMP/android/system/vendor/etc/init/android.hardware.drm-service.widevine.rc"
+printf '%s\n' 'service vendor.drm-widevine-hal /vendor/bin/hw/android.hardware.drm-service.widevine' \
+	'    class hal' '    user media' '    interface aidl android.hardware.drm.IDrmFactory/widevine' >"$wvrc"
+echo 'flags : fpu sse4_2 avx popcnt' >"$TMP/mvproc/cpuinfo"
+movbe() { SRC=../$TMP/media OTTO_ANDROID="$TMP/android" OTTO_TMP="$TMP" OTTO_PROC="$TMP/mvproc" otto_movbe >/dev/null; }
+: >"$TMP/calls"
+movbe
+expect "movbe: Ivy Bridge gets the preload and the library" \
+	"mount --bind $TMP/otto-widevine.rc $wvrc|mount -t overlay -o lowerdir=/mnt/../$TMP/media/otto/lib:$TMP/android/system/vendor/lib64 overlay $TMP/android/system/vendor/lib64" \
+	"$(paste -sd'|' "$TMP/calls")"
+expect "movbe: the preload goes right under the service line" \
+	"service vendor.drm-widevine-hal /vendor/bin/hw/android.hardware.drm-service.widevine|    setenv LD_PRELOAD libotto_movbe.so|    class hal" \
+	"$(head -n 3 "$TMP/otto-widevine.rc" | paste -sd'|')"
+echo 'flags : fpu sse4_2 avx avx2 movbe popcnt' >"$TMP/mvproc/cpuinfo"
+: >"$TMP/calls"
+movbe
+expect "movbe: nothing on a CPU that has MOVBE" "" "$(cat "$TMP/calls")"
+echo 'flags : fpu sse4_2 avx popcnt' >"$TMP/mvproc/cpuinfo"
+: >"$TMP/calls"
+OTTO_MOVBE=off movbe
+expect "movbe: OTTO_MOVBE=off" "" "$(cat "$TMP/calls")"
+rm "$TMP/media/otto/lib/libotto_movbe.so"
+: >"$TMP/calls"
+movbe
+expect "movbe: nothing without the library" "" "$(cat "$TMP/calls")"
+unset -f movbe
+
+# The library itself: the same answers with and without MOVBE in the CPU
+# (QEMU as an Ivy Bridge), and LD_PRELOAD works.
+if command -v cc >/dev/null && command -v qemu-x86_64 >/dev/null; then
+	cc -O2 -static -o "$TMP/movbe_test" "$ROOT/native/movbe/movbe_test.c" "$ROOT/native/movbe/movbe.c"
+	expect "movbe: library tests on this CPU" "movbe: all good" "$("$TMP/movbe_test" 2>&1)"
+	expect "movbe: library tests on an Ivy Bridge" "movbe: all good" \
+		"$(qemu-x86_64 -cpu IvyBridge "$TMP/movbe_test" 2>&1 | grep -v 'uncaught target signal')"
+else
+	echo "skip movbe: library tests (need cc and qemu-user)"
+fi
+
 # Our app as a system app.
 mkdir -p "$TMP/android/system/app" "$TMP/media/otto/system_app/OttoConnect"
 : >"$TMP/calls"

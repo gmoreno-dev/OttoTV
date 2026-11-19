@@ -109,6 +109,9 @@ PREBUILT=${OTTO_PREBUILT:-$ROOT/build/ours}
 [ -n "${OTTO_PREBUILT:-}" ] || "$ROOT/tools/build-ours.sh" "$PREBUILT"
 cp "$PREBUILT/otto-remote" "$REMOTE_BIN"
 cp "$PREBUILT/app.ottotv.connect.apk" "$CONNECT_APK"
+# Protected video on CPUs without MOVBE (otto_movbe in 9-otto).
+mkdir -p "$STAGE/otto/lib"
+cp "$PREBUILT/libotto_movbe.so" "$STAGE/otto/lib/"
 chmod 755 "$REMOTE_BIN"
 [ "$("$REMOTE_BIN" -version)" = "$VERSION" ] ||
 	die "otto-remote in $PREBUILT is $("$REMOTE_BIN" -version), not $VERSION: build it again (tools/build-ours.sh)"
