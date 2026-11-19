@@ -79,9 +79,10 @@ if [ -f "$new/initrd.img" ]; then
 	initrd="$target/initrd$(arg androidboot.slot_suffix).img"
 	[ -f "$initrd" ] || initrd="$target/initrd.img"
 	if [ -f "$initrd" ]; then
-		cp "$initrd" "$initrd.old" &&
-			cp "$new/initrd.img" "$initrd.new" &&
-			mv "$initrd.new" "$initrd" || fail "nao consegui trocar $initrd (o anterior esta em $initrd.old)"
+		if ! { cp "$initrd" "$initrd.old" && cp "$new/initrd.img" "$initrd.new" &&
+			mv "$initrd.new" "$initrd"; }; then
+			fail "nao consegui trocar $initrd (o anterior esta em $initrd.old)"
+		fi
 	fi
 fi
 rm -rf "$new"
