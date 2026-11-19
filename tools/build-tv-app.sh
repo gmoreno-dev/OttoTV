@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# Builds the "Connect phone" TV app (tvapp/) without Gradle: it is one
-# activity, so aapt2, javac, d8 and apksigner are all it needs.
+# Builds Otto TV's app (tvapp/: the home screen, "Connect phone", the
+# keyboard) without Gradle: aapt2, javac, d8 and apksigner are all it needs.
+# Lambdas are fine (d8 turns them into classes); inner and anonymous classes
+# are not: the d8 in build-tools 34 crashes on the parameter metadata recent
+# javac writes for their constructors, so helpers are static nested classes.
 #
 # Usage: tools/build-tv-app.sh <out.apk> <version, e.g. 0.3.0> <keystore>
 # Needs: a JDK and the Android SDK (ANDROID_HOME) with build-tools and a
@@ -23,6 +26,9 @@ for tool in javac keytool zip; do
 	command -v "$tool" >/dev/null || die "'$tool' not found (Debian/Ubuntu: sudo apt install openjdk-17-jdk-headless zip)"
 done
 JAR="$PLATFORM/android.jar"
+# What javac needs to compile lambdas against android.jar.
+LAMBDA="$BT/core-lambda-stubs.jar"
+[ -f "$LAMBDA" ] || die "core-lambda-stubs.jar missing in $BT"
 
 # 0.3.0 -> 300, so newer releases always install over older ones.
 IFS=. read -r major minor patch <<<"$VERSION"
@@ -37,13 +43,23 @@ mkdir -p "$WORK/gen" "$WORK/classes" "$WORK/dex"
 	--manifest "$SRC/AndroidManifest.xml" --java "$WORK/gen" \
 	--min-sdk-version 28 --target-sdk-version 34 \
 	--version-code "$CODE" --version-name "$VERSION" \
+	-A "$SRC/assets" \
 	"$WORK/res.zip"
 
 find "$SRC/src" "$WORK/gen" -name '*.java' >"$WORK/sources"
-javac -nowarn -source 8 -target 8 -bootclasspath "$JAR" -classpath "$JAR" \
+javac -nowarn -source 8 -target 8 -bootclasspath "$JAR:$LAMBDA" -classpath "$JAR" \
 	-d "$WORK/classes" @"$WORK/sources" 2>&1 | grep -v 'warning: \[options\]' || true
 find "$WORK/classes" -name '*.class' >"$WORK/classlist"
 [ -s "$WORK/classlist" ] || die "javac produced no classes"
+# Inner and anonymous classes take their outer object as a "mandated"
+# constructor parameter, which is what d8 trips on: see the note at the top.
+nested=$(find "$WORK/classes" -name '*$*.class')
+inner=""
+if [ -n "$nested" ]; then
+	# shellcheck disable=SC2086  # one argument per class file
+	inner=$(javap -v $nested 2>/dev/null | awk '/^Classfile /{c=$2} / mandated/{print c}' | sort -u)
+fi
+[ -z "$inner" ] || die "inner or anonymous classes (make them static nested classes): $inner"
 "$BT/d8" --release --min-api 28 --lib "$JAR" --output "$WORK/dex" @"$WORK/classlist"
 (cd "$WORK/dex" && zip -q "$WORK/app.apk" classes.dex)
 

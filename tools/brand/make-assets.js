@@ -4,6 +4,8 @@
 // need a browser. Run it after changing art/brand/otto-geo.js or the texts:
 //
 //   node tools/brand/make-assets.js        (needs Playwright with Chromium)
+//   node tools/brand/make-assets.js launcher   (one group: brand, bootmenu,
+//     bootanimation, installer, connect, launcher, remote)
 //
 // Writes:
 //   art/brand/*.svg                           the brand's SVG files (from otto-geo.js)
@@ -12,6 +14,7 @@
 //   iso/otto/installer/branding/otto/*.png    installer images
 //   iso/otto/installer/wallpaper.png          installer desktop
 //   tvapp/res/drawable*/{icon,banner,preparing,loading}.png  "Connect phone" app
+//   tvapp/res/drawable-nodpi/home_*.png       the launcher's art
 //   remote/web/static/icon-*.png              phone remote (home screen icon)
 //   remote/web/static/{otto-*.svg,inter.woff2}  "Connect phone" and the remote
 const fs = require('fs');
@@ -203,6 +206,51 @@ async function connectApp(browser) {
   await render(browser, banner('Connect', 'phone'), path.join(ROOT, 'tvapp/res/drawable-nodpi/banner.png'), { opaque: true });
 }
 
+// Shortcuts (F1): Otto holding a keyboard and a phone. The design draws it
+// in a 440x360 box with a bigger body: here its keyboard, phone and the two
+// tentacles holding them are mapped onto the 200 box, so the body, face and
+// other tentacles are the same as in every other pose.
+function holdPose() {
+  const s = 34 / 78;
+  const M = (p) => [100 + (p[0] - 220) * s, 88 + (p[1] - 150) * s];
+  const inDesign = (m) => '<g transform="translate(100 88) scale(' + s.toFixed(5) + ') translate(-220 -150)">' + m + '</g>';
+  const keys = [];
+  const key = (x, y, w, h) => keys.push(G.P(G.rrect(x, y, w, h, 2.5), '#C3CCD7'));
+  for (let i = 0; i < 8; i++) key(30 + i * 14, 238, 12, 9);
+  key(142, 238, 14, 9);
+  key(30, 251, 17, 9);
+  for (let i = 0; i < 6; i++) key(49 + i * 14, 251, 12, 9);
+  key(133, 251, 23, 9);
+  key(30, 264, 18, 8); key(52, 264, 82, 8); key(138, 264, 18, 8);
+  const keyboard = inDesign('<g transform="rotate(-10 92 250)">' + G.P(G.rrect(18, 226, 150, 58, 12), '#3A4556') +
+    G.P(G.rrect(26, 234, 134, 42, 7), '#2C3542') + keys.join('') + '</g>');
+  const phone = inDesign('<g transform="rotate(12 372 160)">' + G.P(G.rrect(344, 104, 58, 112, 14), '#2B3340') +
+    G.P(G.rrect(350, 113, 46, 94, 9), '#3E4A5C') +
+    '<circle cx="373" cy="148" r="13" fill="none" stroke="#C3CCD7" stroke-width="3.5"></circle>' +
+    G.P(G.circ(373, 148, 4.5) + G.circ(364, 178, 3.4) + G.circ(382, 178, 3.4), '#C3CCD7') +
+    G.P(G.rrect(365, 192.5, 16, 3, 1.5), '#C3CCD7') + '</g>');
+  const left = G.mapG([[[146, 192], [124, 194], [108, 204], [98, 220]], [[98, 220], [92, 230], [98, 240], [106, 236]]], M);
+  const right = G.mapG([[[294, 186], [316, 186], [332, 176], [340, 160]], [[340, 160], [344, 152], [352, 147], [355, 153]]], M);
+  const arm = (g) => G.P(G.taper(g, 22 * s, 6 * s), G.COL.body) + G.P(G.suck(g, 22 * s, 6 * s, 3), G.COL.suck);
+  return G.pose('neutral', { sides: [], after: keyboard + arm(left) + phone + arm(right) });
+}
+
+// The launcher (tvapp/, home/): the logo in the top bar, Otto saying hi on
+// a fresh system and in the quick panel, peeking out of the laptop when
+// there are no favorites, and holding a keyboard and a phone on the
+// shortcuts screen. Drawn at twice the design's size for TVs above 1080p.
+async function launcher(browser) {
+  const dir = path.join(ROOT, 'tvapp/res/drawable-nodpi');
+  await render(browser, mark(56), path.join(dir, 'home_logo.png'), { scale: 2 });
+  await render(browser, mark(176), path.join(dir, 'home_empty.png'), { scale: 2 });
+  await render(browser, '<svg viewBox="32 31 136 136" width="290" height="290">' + G.pose('wave') + '</svg>',
+    path.join(dir, 'home_welcome.png'), { scale: 2 });
+  await render(browser, '<svg viewBox="32 31 136 136" width="72" height="72">' + G.pose('wave') + '</svg>',
+    path.join(dir, 'home_hello.png'), { scale: 2 });
+  await render(browser, '<svg viewBox="4.1 22.6 191.8 156.9" width="166" height="136">' + holdPose() + '</svg>',
+    path.join(dir, 'home_shortcuts.png'), { scale: 2 });
+}
+
 async function phoneRemote(browser) {
   // Home screen icon for the phone remote: full-bleed (iOS rounds it).
   const icon = (size) =>
@@ -230,15 +278,28 @@ async function phoneRemote(browser) {
 
 (async () => {
   const browser = await chromium.launch();
+  // `node make-assets.js launcher` redoes one group only.
+  const only = process.argv[2];
+  const steps = {
+    brand: async () => brandSvgs(),
+    bootmenu: () => bootMenuLogo(browser),
+    bootanimation: async () => {
+      await bootAnimation(browser, 'bootanimation.zip');
+      await bootAnimation(browser, 'bootanimation-first.zip', ['Preparando tudo pela primeira vez.', 'Isso leva alguns minutos.']);
+    },
+    installer: async () => {
+      await installer(browser);
+      await installerWallpaper(browser);
+    },
+    connect: () => connectApp(browser),
+    launcher: () => launcher(browser),
+    remote: () => phoneRemote(browser),
+  };
+  if (only && !steps[only]) throw new Error('unknown step ' + only + ' (' + Object.keys(steps).join(', ') + ')');
   try {
-    brandSvgs();
-    await bootMenuLogo(browser);
-    await bootAnimation(browser, 'bootanimation.zip');
-    await bootAnimation(browser, 'bootanimation-first.zip', ['Preparando tudo pela primeira vez.', 'Isso leva alguns minutos.']);
-    await installer(browser);
-    await installerWallpaper(browser);
-    await connectApp(browser);
-    await phoneRemote(browser);
+    for (const [name, step] of Object.entries(steps)) {
+      if (!only || only === name) await step();
+    }
   } finally {
     await browser.close();
   }

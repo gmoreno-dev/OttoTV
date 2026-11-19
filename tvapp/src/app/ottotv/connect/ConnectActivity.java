@@ -38,6 +38,9 @@ public class ConnectActivity extends Activity {
     /** In case the window never reports focus. */
     static final long START_ANYWAY_MS = 1000;
 
+    /** On screen now: the "Phone connected" notice is left to this screen. */
+    public static volatile boolean visible;
+
     private final Handler handler = new Handler(Looper.getMainLooper());
     private FrameLayout root;
     private View waiting;
@@ -93,11 +96,13 @@ public class ConnectActivity extends Activity {
     protected void onPause() {
         super.onPause();
         paused = true;
+        visible = false;
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        visible = true;
         if (paused && web != null) {
             // Back from Wi-Fi settings: the page may now have a QR code to show.
             paused = false;

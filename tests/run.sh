@@ -838,8 +838,18 @@ if command -v javac >/dev/null && [ -n "$sdk_jar" ]; then
 	else
 		fail "tvapp: Enter key" "$(grep -v 'warning: \[options\]' "$TMP/java.log" | tail -n 20)"
 	fi
+	mkdir -p "$TMP/java-home"
+	home="$ROOT/tvapp/src/app/ottotv/connect/home"
+	if javac -nowarn -source 8 -target 8 -bootclasspath "$sdk_jar" -d "$TMP/java-home" \
+		"$home/Svg.java" "$home/Tone.java" "$home/Icons.java" \
+		"$ROOT/tvapp/test/HomeMathTest.java" >"$TMP/java-home.log" 2>&1 &&
+		java -cp "$TMP/java-home" app.ottotv.connect.home.HomeMathTest >>"$TMP/java-home.log" 2>&1; then
+		pass "tvapp: home screen icons (SVG paths) and app colors"
+	else
+		fail "tvapp: home screen math" "$(grep -v 'warning: \[options\]' "$TMP/java-home.log" | tail -n 20)"
+	fi
 else
-	echo "skip tvapp: Enter key (needs javac and ANDROID_HOME)"
+	echo "skip tvapp: Enter key and home screen math (need javac and ANDROID_HOME)"
 fi
 
 # --- Phone remote (Go) ---------------------------------------------------------------

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Otto TV's own app:
+     - the home screen (home/HomeActivity), with its quick panel (F2),
+       shortcuts (F1) and quick notices over any app (home/ToastReceiver).
      - "Connect phone": a thin full-screen shell around the pairing screen
        that otto-remote serves on the TV itself (see remote/web/tv.html).
      - "Almost ready": what a first boot shows while the home screen would
@@ -10,19 +12,88 @@
     package="app.ottotv.connect">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- A launcher lists every app. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <!-- "Uninstall" in an app's menu (Android still asks first). -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <!-- Granted by init-hooks.sh: which app was used last ("Continue"),
+         and notices over other apps. -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
     <application
-        android:label="@string/app_name"
+        android:label="@string/home_name"
         android:icon="@drawable/icon"
         android:banner="@drawable/banner"
         android:allowBackup="false"
         android:usesCleartextTraffic="true"
         android:theme="@style/Otto">
 
+        <!-- The home screen. One task, always the same instance. -->
+        <activity
+            android:name=".home.HomeActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:stateNotNeeded="true"
+            android:clearTaskOnLaunch="true"
+            android:excludeFromRecents="true"
+            android:resumeWhilePausing="true"
+            android:screenOrientation="landscape"
+            android:windowSoftInputMode="adjustNothing"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode">
+            <intent-filter android:priority="2">
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- F2, over any app: its own task, so it opens over the app on screen. -->
+        <activity
+            android:name=".home.PanelActivity"
+            android:exported="true"
+            android:theme="@style/Otto.Overlay"
+            android:taskAffinity="app.ottotv.connect.panel"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:screenOrientation="landscape"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode" />
+
+        <!-- F1, over any app. -->
+        <activity
+            android:name=".home.ShortcutsActivity"
+            android:exported="true"
+            android:theme="@style/Otto.Overlay"
+            android:taskAffinity="app.ottotv.connect.shortcuts"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:screenOrientation="landscape"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode" />
+
+        <!-- Notices from otto-remote (root): only senders allowed to change
+             secure settings get in. -->
+        <receiver
+            android:name=".home.ToastReceiver"
+            android:exported="true"
+            android:permission="android.permission.WRITE_SECURE_SETTINGS" />
+
         <activity
             android:name=".ConnectActivity"
+            android:label="@string/app_name"
             android:exported="true"
             android:screenOrientation="landscape"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout">

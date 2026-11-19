@@ -5,4 +5,12 @@
         <item name="android:colorBackground">@color/night</item>
         <item name="android:windowSplashScreenBackground">@color/night</item>
     </style>
+    <!-- The quick panel and the shortcuts: see-through, they draw their own
+         veil and slide in themselves. -->
+    <style name="Otto.Overlay">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
 </resources>
