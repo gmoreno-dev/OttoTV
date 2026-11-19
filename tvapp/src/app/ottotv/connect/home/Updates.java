@@ -45,7 +45,8 @@ final class Updates {
     private static final String TAG = "OttoUpdates";
     private static final String MANIFEST = "otto-tv-update.json";
     private static final long EVERY = 6 * 3600_000L;
-    private static final long RETRY = 10 * 60_000L;
+    /** After a failure on our side (no network yet, otto-remote starting). */
+    private static final long RETRY = 60_000L;
 
     /** The quick panel, while it shows. */
     interface Listener {
@@ -94,7 +95,7 @@ final class Updates {
         try {
             JSONObject info = Remote.request("GET", "/app/update", null, 3000);
             if (info == null) {
-                retrySoon();
+                retrySoon(app);
                 return;
             }
             String installed = info.optString("installed");
@@ -130,14 +131,27 @@ final class Updates {
                     tell(app);
                 }
             });
+        } catch (Refused e) {
+            // GitHub answered, just not with a release: ask again in a few
+            // hours, not every minute (it allows 60 questions an hour).
+            Log.i(TAG, "no update: " + e.getMessage());
         } catch (IOException | JSONException | RuntimeException e) {
-            Log.i(TAG, "no update: " + e);
-            retrySoon();
+            Log.i(TAG, "no update yet: " + e);
+            retrySoon(app);
         }
     }
 
-    private static void retrySoon() {
+    /** GitHub said no (no release yet, too many questions...). */
+    static final class Refused extends IOException {
+        Refused(String message) {
+            super(message);
+        }
+    }
+
+    /** Early in a boot the network or otto-remote may not be up yet. */
+    private static void retrySoon(Context app) {
         checkAt = SystemClock.elapsedRealtime() + RETRY;
+        MAIN.postDelayed(() -> check(app), RETRY + 1000);
     }
 
     /** The quick panel's button: download and install (or try again). */
@@ -264,7 +278,7 @@ final class Updates {
         HttpURLConnection c = open(url, 15_000);
         try {
             if (c.getResponseCode() != 200) {
-                throw new IOException(url + ": HTTP " + c.getResponseCode());
+                throw new Refused(url + ": HTTP " + c.getResponseCode());
             }
             JSONObject j = readJSON(c.getInputStream());
             if (j == null) {
