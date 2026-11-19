@@ -299,6 +299,24 @@ expect "detach: child leaves init.sh's cgroup before we return" \
 	"no|$(cat "$TMP/child")" "$started|$moved"
 unset -f setsid
 
+# And the child moves itself before its first command, so nothing it starts
+# is left behind in the old cgroup (0.6.2: the compile delay's sleep was,
+# and died with init.sh). Here our own move does nothing, and the child
+# starts late, so only its own move can fill the file.
+# shellcheck disable=SC2329  # mocks, called by otto_detach
+setsid() { sleep 0.2; "$@"; }
+# shellcheck disable=SC2329
+echo() { :; }
+rm -f "$TMP/cgroup.procs" "$TMP/seen"
+# shellcheck disable=SC2016  # expanded by the inner shell
+otto_detach '{ cat "$0"; echo "$$"; } >"$1"' "$TMP/cgroup.procs" "$TMP/seen"
+unset -f echo
+wait
+unset -f setsid
+first=$(sed -n 1p "$TMP/seen" 2>/dev/null)
+expect "detach: the child moves itself before its first command" \
+	"$(sed -n 2p "$TMP/seen" 2>/dev/null)" "${first:-nothing}"
+
 # shellcheck disable=SC2329  # mocks, called by otto_setup_done
 {
 	settings() {

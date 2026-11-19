@@ -24,16 +24,27 @@ otto_log() {
 # is a oneshot service. Inside the script, $0, $1... are the extra arguments.
 # Usage: otto_detach '<script>' [args...]
 #
-# The child is moved out of the cgroup here, before we return. Up to 0.3.3
-# the child moved itself, which races init: when otto_detach was the last
-# thing init.sh did, init could kill the group first. That is how the
-# setup-done step died silently, leaving Home and developer options dead.
+# The child is moved out of the cgroup twice, by both sides:
+#  - here, before we return. Up to 0.3.3 only the child moved itself, which
+#    races init: when otto_detach was the last thing init.sh did, init could
+#    kill the group first. That is how the setup-done step died silently,
+#    leaving Home and developer options dead.
+#  - by the child, before its first command. Moving a process doesn't move
+#    the children it already has, so when the script started a command
+#    before our move landed, that command stayed behind and died with
+#    init.sh. Up to 0.6.2 that was the `sleep` in front of the app
+#    compilation, which then ran right away, in the middle of the boot.
+#    `echo` is built into the shell, so this move starts nothing.
 otto_detach() {
-	local script="$1" pid g
+	local script="$1" pid g procs move=""
 	shift
-	setsid sh -c "$script" "$@" </dev/null >/dev/null 2>&1 &
+	procs=${OTTO_CGROUP_PROCS:-/sys/fs/cgroup/cgroup.procs /acct/cgroup.procs}
+	for g in $procs; do
+		move="$move echo \$\$ >$g;"
+	done
+	setsid sh -c "{ $move } 2>/dev/null; $script" "$@" </dev/null >/dev/null 2>&1 &
 	pid=$!
-	for g in ${OTTO_CGROUP_PROCS:-/sys/fs/cgroup/cgroup.procs /acct/cgroup.procs}; do
+	for g in $procs; do
 		echo "$pid" >"$g"
 	done 2>/dev/null
 }
