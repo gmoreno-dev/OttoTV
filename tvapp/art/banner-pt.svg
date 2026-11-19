@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180">
+  <rect width="320" height="180" fill="#1A2130"/>
+  <circle cx="78" cy="90" r="44" fill="#252E40"/>
+  <circle cx="78" cy="90" r="17" fill="#F2B25C"/>
+  <g fill="#44516E"><circle cx="92.5" cy="54.9" r="3"/><circle cx="113.1" cy="75.5" r="3"/><circle cx="113.1" cy="104.5" r="3"/><circle cx="92.5" cy="125.1" r="3"/><circle cx="63.5" cy="125.1" r="3"/><circle cx="42.9" cy="104.5" r="3"/><circle cx="42.9" cy="75.5" r="3"/><circle cx="63.5" cy="54.9" r="3"/></g>
+  <text x="142" y="84" font-family="Inter" font-weight="700" font-size="30" fill="#E8ECF3">Conectar</text>
+  <text x="142" y="120" font-family="Inter" font-weight="700" font-size="30" fill="#E8ECF3">celular</text>
+</svg>

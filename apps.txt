@@ -1,0 +1,14 @@
+# Apps baked into the ISO and installed on first boot.
+#
+# Only open-source apps from the official F-Droid repository: F-Droid builds
+# them from source and their licenses allow redistribution. build.sh asks the
+# F-Droid API for the current version, so this list never goes stale.
+#
+# Format: fdroid <package name>
+
+# App store for open-source apps
+fdroid org.fdroid.fdroid
+# Play Store catalog without a Google account
+fdroid com.aurora.store
+# Web browser
+fdroid com.duckduckgo.mobile.android

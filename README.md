@@ -1,0 +1,252 @@
+# TV Box
+
+Turn an old PC or laptop into a fast, plug-and-play Android TV box for any TV.
+Flash a USB stick, plug the computer into the TV over HDMI, try it live, then
+install it.
+
+> Status: **v0.3.10, early development.** Tested on one machine so far:
+> [Acer HM77 / Ivy Bridge](docs/hardware/acer-hm77-ivybridge.md).
+
+## How it works
+
+TV Box is built on [LineageOS TV x86](https://github.com/LineageOS-TV-x86)
+(Android TV 14 for PCs). Instead of rebuilding Android, `build.sh` remasters the
+upstream ISO: the 2+ GB system image is reused as is, and we only add small
+files that plug into extension points upstream already has.
+
+```
+USB stick
+ ├─ GRUB menu (/boot/grub/grub.cfg)          ← ours: menu, defaults, boot args
+ ├─ /cmdline.txt                              ← ours: boot args for installed systems
+ ├─ initrd: sources /scripts/* from the boot
+ │   media and calls post_detect()
+ │   (defined nowhere)                        ← ours: iso/scripts/9-tvbox
+ │      ├─ live/installed boot:
+ │      │    ├─ bind-mounts init.sh with our hooks prepended
+ │      │    ├─ overlays /system/etc/user_app (add/remove first-boot apps)
+ │      │    ├─ bind-mounts key layouts where Esc sends Back
+ │      │    ├─ bind-mounts /tvbox on /boot/tvbox (Android only sees
+ │      │    │  the media's /boot folder, so that's where it finds us)
+ │      │    └─ hides upstream's setup wizard (overlay whiteouts)
+ │      └─ install mode:
+ │           └─ adds a step to the Calamares installer that copies
+ │              /scripts and /tvbox to the installed system
+ └─ Android: /system/etc/init.sh calls
+     post_init / post_bootcomplete
+     (defined nowhere)                        ← ours: iso/tvbox/init-hooks.sh
+        ├─ finds the HDMI output with a TV attached and routes audio to it
+        ├─ picks the on-screen keyboard (none with a physical keyboard)
+        └─ starts tvbox-remote, the phone remote   ← ours: remote/ (Go)
+```
+
+### Phone remote
+
+```
+ phone browser ──── http + WebSocket on the home Wi-Fi ────▶ tvbox-remote (root)
+ (iPhone or Android,                                          ├─ serves the remote page
+  nothing to install)                                         ├─ pairs phones (QR or PIN)
+                                                              └─ /dev/uinput: virtual keyboard
+ TV: "Connect phone" app ── WebView on 127.0.0.1 ──▶ QR code      and mouse that Android
+     (tvapp/, ~30 KB)                                             treats like USB ones
+```
+
+Android won't let an app type into other apps, but the boot hooks run as
+root, so `tvbox-remote` creates virtual input devices through uinput
+instead. To Android they look like a USB keyboard and mouse, so the remote
+works on every screen, system settings and dialogs included.
+
+Pairing needs someone in front of the TV: the QR code carries a 256-bit token
+in the URL fragment (browsers never send fragments to servers, so it stays
+out of logs), and the PIN alternative only works while the pairing screen is
+open, with a few guesses before it changes. The pairing screen itself is only
+served to the TV, checked by address and Host header, so a web page can't
+reach it through DNS rebinding.
+
+**Live and installed systems behave the same.** The upstream installer only
+copies the system image, kernel, initrd and recovery to disk, so on its own it
+would leave our files behind. Two things carry them over: our installer step
+copies `/scripts` and `/tvbox` next to the installed kernel (where the
+installed initrd looks for `/scripts`), and the installer writes the first
+line of `/cmdline.txt` into the installed boot entries.
+
+Nothing on the system image changes, so builds are small and fast, and
+moving to a new upstream release is mostly bumping the ISO hash.
+
+## Features
+
+- **Phone remote, no app to install.** Scan the QR code on the TV and the
+  phone's browser becomes a remote: directional pad, OK, back, home, volume,
+  play/pause, a touchpad and a keyboard that types on the TV (accents
+  included). Works on iPhone and Android, and can be added to the home
+  screen like an app. Holding a button repeats, like a real remote.
+- **Laptop keyboards that make sense on a TV.** Esc goes back (there is no
+  Back key on a PC keyboard, and Android TV apps rely on one), the Windows
+  key goes home, Alt+F4 closes the app on screen (on the home screen it
+  opens the power menu, like on a Windows desktop) and Ctrl+Alt+Del opens
+  the power menu. The shortcuts come from the phone remote's service, which
+  reads the keyboard without taking keys away from Android. And the
+  on-screen keyboard stays out of the way when a physical keyboard is
+  plugged in. Android TV's keyboard ignores that setting on purpose, so TV
+  Box switches to its own invisible keyboard, where Enter does what the TV
+  keyboard's "›" button does (screens like the Wi-Fi password only continue
+  on it). Upstream maps the big Enter key to the remote's OK, which is great
+  in menus and does nothing in a text field, so in text fields that key is
+  turned back into Enter; the remote's own OK is left alone. Remote-only
+  setups keep the TV keyboard. Key decisions are logged:
+  `adb logcat -s TVBoxKeyboard`.
+- **The laptop screen goes dark when you want.** A button on the phone
+  remote (and the laptop's own display Fn key, where it sends one) turns
+  the laptop's screen dark while the TV is the screen. The choice is saved,
+  and the screen always lights up again when no TV is connected, or while
+  the TV isn't showing the picture yet.
+- **The TV shows the picture as soon as it's plugged in.** Android 14 keeps
+  an HDMI screen dark until someone answers "Mirror to display?", asked on
+  the laptop's own screen (unseen with that screen dark or the lid closed).
+  TV Box skips the question; `TVBOX_MIRROR=ask` brings it back.
+- **Compressed memory (zram) that actually turns on.** Upstream's zram
+  script dies on the `BOOT_IMAGE=(hd96)/kernel` GRUB adds to the command
+  line, so no machine got it. TV Box fixes the script at boot; it matters
+  most on laptops with 2 to 4 GB of RAM.
+- **Ready when the home screen shows.** The Home key, the keyboard and the
+  phone remote come up first thing at boot complete, before upstream
+  installs its bundled apps (about 30 seconds in live mode). Our app is a
+  system app so it is there from the start.
+- **HDMI audio that just works.** Reads the HDMI jack sensors on every sound
+  card and routes sound to the one with a TV attached, retrying after boot in
+  case the TV was still waking up. No hard-coded device numbers, so it is
+  meant to cover Intel, AMD and Nvidia HDMI audio (verified on Intel so far).
+  See the
+  [investigation](docs/hardware/acer-hm77-ivybridge.md#the-hdmi-audio-investigation).
+- **Apps ready on first boot:** F-Droid (open-source app store), Aurora Store
+  (Play Store catalog, no Google account) and DuckDuckGo (browser). `apps.txt`
+  lists them by package name; the build fetches the current version from
+  F-Droid and records exact versions and hashes in `apps.lock`. Only
+  open-source apps whose licenses allow redistribution go in the ISO.
+- **Leaner first boot.** Drops upstream apps a TV doesn't need (root manager,
+  camera, game key mapper).
+- **Straight to the point on first boot.** Upstream's setup wizard (a
+  Bluetooth accessory search, then a LineageOS features page) is hidden.
+  TV Box's own first-run screen asks for Wi-Fi when the TV is offline, then
+  shows the phone remote's QR code; Bluetooth pairing is one button away
+  instead of a step everyone has to sit through.
+- **Brazilian defaults.** Portuguese and `America/Sao_Paulo`, both
+  configurable in `config.env`.
+- **Compatibility mode** boot entry (software rendering) for GPUs the
+  hardware drivers can't drive.
+- **Fixes an upstream GRUB bug:** the "Disable Hardware Acceleration" toggle
+  never reached the kernel (`$hwacccel` typo, plus quoting that turned
+  multi-word options into one argument).
+
+## Build
+
+Needs Linux (WSL works) with `xorriso`, `curl`, `python3`, Go, a JDK and a
+slice of the Android SDK (for TV Box's own 30 KB app: the "Connect phone"
+screen and the physical-keyboard keyboard):
+
+```sh
+sudo apt install xorriso curl python3 golang openjdk-17-jdk-headless zip
+tools/setup-android-sdk.sh && export ANDROID_HOME=~/android-sdk
+./build.sh path/to/upstream.iso     # or set UPSTREAM_ISO_URL in config.env
+```
+
+The TV app is built without Gradle (`tools/build-tv-app.sh`: aapt2, javac,
+d8, apksigner), and signed with a key kept in `cache/tvapp.keystore`.
+`TVBOX_PREBUILT=<dir>` takes `tvbox-remote` and `app.tvbox.connect.apk` from a
+folder instead of compiling them.
+
+The result is `out/tvbox-<version>.iso`, its `.sha256` and its `.apps.lock`.
+Write the ISO to a USB stick with Rufus, balenaEtcher or `dd`, or copy it to a
+Ventoy stick.
+
+The CI workflow lints and tests on every push, and builds the ISO when run by
+hand (Actions → CI → Run workflow).
+
+## Boot options
+
+Uppercase `VAR=value` pairs on the kernel command line become shell variables
+in Android's `init.sh`, which both upstream and our hooks read.
+`EXTRA_KERNEL_ARGS` in `config.env` sets them for the live menu and, through
+`/cmdline.txt`, for installed systems:
+
+| Option              | Default             | Effect |
+|---------------------|---------------------|--------|
+| `TVBOX_AUDIO`       | `auto`              | `off` skips HDMI audio detection |
+| `TVBOX_LOCALE`      | `pt-BR`             | Default language (a language the user picks wins) |
+| `TVBOX_MIRROR`      | `auto`              | `ask` keeps Android's "Mirror to display?" question (from the next boot) |
+| `TVBOX_ESC`         | `back`              | `escape` keeps Esc as Esc |
+| `TVBOX_IME`         | `auto`              | `tv` always uses the TV keyboard, `hard` never shows one |
+| `TVBOX_REMOTE`      | `on`                | `off` doesn't start the phone remote (nor the keyboard shortcuts) |
+| `TVBOX_SETUP`       | `ours`              | `wizard` keeps upstream's setup wizard |
+| `SET_TZ_LOCATION`   | `America/Sao_Paulo` | Time zone (upstream option) |
+
+To try one without rebuilding, press `e` on a menu entry, append it to the
+`linux` line and boot with Ctrl+X.
+
+## Development
+
+```sh
+tests/run.sh
+```
+
+Covers HDMI detection against real device dumps, `post_init` with Android's
+commands mocked, keyboard detection and the on-screen keyboard choice, the
+Esc key layout patch, GRUB patching and rendering, the installer patch
+against the real upstream `settings.conf`, the installer job against a fake
+Calamares, the F-Droid helper, the TV app's Enter key logic, and the phone
+remote (`remote/`, `go test`:
+typing, held keys, pairing, the TV-only routes and a WebSocket session
+against a fake keyboard).
+
+`tools/device/input-test.sh` collects input diagnostics from a running box
+and tries the keyboard fixes live, without a new ISO.
+`tools/device/update.sh` updates an installed system to a new build over
+ADB, without reinstalling: the build writes `out/tvbox-<version>-update.tar`
+with just our files. `tools/device/baseline.sh` measures a box (boot time, RAM, app start times,
+home screen smoothness, CPU, storage and Wi-Fi), so every optimization is
+compared against numbers from the same machine; `baseline.sh video` measures
+what playback costs while a video plays.
+
+Debugging on a device goes through ADB over the network: enable developer
+options, rooted debugging and network debugging, then
+`adb connect <ip>:5555 && adb root`. Our hooks log to the kernel log
+(`adb shell dmesg | grep tvbox`) and to logcat (`adb logcat -s tvbox`).
+
+## Known gaps
+
+- **Installation:** first run on real hardware done (the Acer: BIOS, HDD),
+  and the installed system boots with our hooks. Measurements of installed
+  boots are next.
+- **App verification:** apps come over HTTPS from f-droid.org, picked through
+  F-Droid's v1 API. F-Droid recommends its signed index for fetching apps;
+  verifying against it is on the roadmap.
+- **Wi-Fi and keyboard layout** are set by hand in Settings for now (Wi-Fi
+  passwords can be typed from the phone remote).
+- **The phone remote is new in v0.3** and its uinput side has only run in
+  tests so far (no uinput in CI): the first run on the Acer is next.
+- **Phone remote on plain HTTP:** traffic stays on the home network, but it
+  is not encrypted, so someone already on that Wi-Fi could read the token.
+  The TV's address can also change; a fixed `.local` name is next.
+- **Typing from the phone** goes through a US layout with Alt dead keys, so
+  Portuguese accents work in standard text fields; emoji and other scripts
+  are skipped (the phone says so).
+- **The laptop's own screen** can only be turned dark (its backlight), so
+  the GPU still draws for it. Switching the panel itself off while the
+  system boots (v0.3.7) crashed the GPU driver on the Acer (Ivy Bridge) and
+  left it rebooting in a loop, with no crash log. An "only the TV" mode
+  with `video=LVDS-1:d` on the kernel command line is still to be tried.
+- **Right mouse button as Back** isn't there yet: Esc, the phone and a
+  two-finger tap on the phone's touchpad cover it.
+- **Installed menu branding** still comes from upstream's installer.
+- **Old Intel Macs:** upstream also ships an HFS+ copy of the boot media for
+  Macs. libisofs 1.5.6 fails to lay it out next to the EFI partition once
+  files change ("GPT partitions overlap"), so the build drops it. PCs boot
+  through BIOS or UEFI as before; Macs that only boot from HFS+ won't.
+- **Release hosting:** the ISO is ~2.4 GB and GitHub release assets are capped
+  at 2 GB, so CI builds land as short-lived workflow artifacts for now.
+
+## Credits
+
+Built on [LineageOS TV x86](https://github.com/LineageOS-TV-x86), which builds
+on LineageOS, [Bliss OS](https://blissos.org) and Android-x86. TV Box only adds
+boot-time configuration on top of their work. Bundled apps come from
+[F-Droid](https://f-droid.org) under their own open-source licenses.

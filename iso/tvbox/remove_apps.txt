@@ -1,0 +1,10 @@
+# APKs from upstream's /system/etc/user_app that a TV box doesn't need.
+# One file name per line, as listed by `adb shell ls /system/etc/user_app`.
+# Hidden at boot by 9-tvbox, so they are never installed.
+
+# Root manager: not something to hand every user by default.
+kernelsu.apk
+# A TV has no camera.
+net.sourceforge.opencamera.apk
+# Gamepad/keyboard mapper for games.
+xtmapper.apk

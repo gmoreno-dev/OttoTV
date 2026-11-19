@@ -1,0 +1,114 @@
+/* "Connect phone" screen on the TV. The TV's WebView is about 960x540 CSS
+   pixels and read from the couch: big type, nothing thin. */
+:root {
+  --night: #1A2130;
+  --surface: #252E40;
+  --text: #E8ECF3;
+  --muted: #98A3B8;
+  --amber: #F2B25C;
+  --amber-ink: #2A1C05;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--night);
+  color: var(--text);
+  font: 20px/1.4 Roboto, "Segoe UI", sans-serif;
+  overflow: hidden;
+}
+
+.connect {
+  height: 100%;
+  padding: 28px 58px;
+  display: flex;
+  align-items: center;
+  gap: 56px;
+}
+
+.qr {
+  flex: none;
+  width: 312px;
+  height: 312px;
+  padding: 6px;
+  border-radius: 28px;
+  background: #fff;
+}
+.qr svg { width: 100%; height: 100%; display: block; }
+
+.steps { min-width: 0; }
+h1 {
+  margin: 0 0 18px;
+  font-size: 36px;
+  line-height: 1.1;
+  font-weight: 700;
+}
+ol {
+  margin: 0 0 24px;
+  padding-left: 1.3em;
+}
+li { margin: 4px 0; }
+li::marker { color: var(--amber); font-weight: 700; }
+
+.manual { margin: 0; color: var(--muted); font-size: 18px; }
+.address { margin: 4px 0 6px; font-size: 22px; font-weight: 700; }
+.pin {
+  margin: 0 0 18px;
+  font-size: 54px;
+  font-weight: 700;
+  letter-spacing: .18em;
+  color: var(--amber);
+  font-variant-numeric: tabular-nums;
+}
+.tip { margin: 0; color: var(--muted); font-size: 16px; }
+
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 6px;
+}
+button {
+  font: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  border: 0;
+  border-radius: 999px;
+  padding: 14px 28px;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+}
+.primary { background: var(--amber); color: var(--amber-ink); }
+.secondary { background: var(--surface); color: var(--text); }
+/* Focus is how a TV shows where you are: make it unmistakable. */
+button:focus { outline: none; transform: scale(1.06); box-shadow: 0 0 0 4px var(--night), 0 0 0 8px var(--amber); }
+
+.offline { justify-content: flex-start; }
+.offline .steps { max-width: 640px; }
+.step { margin: 0 0 8px; color: var(--amber); font-weight: 700; font-size: 18px; }
+.lead { margin: 0 0 28px; color: var(--muted); font-size: 22px; }
+.offline .tip { margin-top: 24px; }
+
+@media (prefers-reduced-motion: reduce) {
+  button { transition: none; }
+}
+
+.done {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.done svg {
+  width: 112px; height: 112px;
+  fill: none; stroke: var(--amber); stroke-width: 6;
+  stroke-linecap: round; stroke-linejoin: round;
+  margin-bottom: 20px;
+}
+.done h1 { font-size: 40px; margin-bottom: 8px; }
+.done p { margin: 0; color: var(--muted); }

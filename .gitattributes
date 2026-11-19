@@ -1,0 +1,4 @@
+# Shell scripts and boot configs run on Linux/Android: keep LF even on Windows.
+* text=auto eol=lf
+*.apk binary
+*.iso binary

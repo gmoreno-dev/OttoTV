@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#1A2130">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Otto TV">
+<title>Otto TV</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="remote.css">
+<script src="remote.js" defer></script>
+</head>
+<body>
+
+<!-- Pairing: shown until this phone has the TV's token. -->
+<main id="pair" class="screen" hidden>
+  <div class="pair">
+    <svg class="pair-mark" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="22" fill="none" stroke="currentColor" stroke-width="5"/><circle cx="32" cy="32" r="8" fill="currentColor"/></svg>
+    <h1 data-t="pairTitle">Pair with the TV</h1>
+    <p data-t="pairHint">On the TV, open Connect phone and type the 6-digit code shown there.</p>
+    <form id="pair-form" autocomplete="off">
+      <label class="visually-hidden" for="pin" data-t="pinLabel">Code</label>
+      <input id="pin" name="pin" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+             autocomplete="one-time-code" placeholder="000000" required>
+      <button class="primary" type="submit" data-t="pairButton">Pair</button>
+      <p id="pair-error" class="error" role="alert"></p>
+    </form>
+  </div>
+</main>
+
+<!-- The remote itself. -->
+<main id="remote" class="screen" hidden>
+  <header class="top">
+    <div class="tv">
+      <span id="status-dot" class="dot" aria-hidden="true"></span>
+      <span id="tv-name">TV</span>
+      <span id="status-text" class="muted"></span>
+    </div>
+    <div class="top-actions">
+      <!-- Shown when the TV runs on a laptop: turns its own screen dark. -->
+      <button id="laptop-btn" class="icon-btn" aria-pressed="false" aria-label="Turn the laptop screen off" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19.5h20"/><path class="slash" d="M4 3.5l16 14"/></svg>
+      </button>
+      <button class="icon-btn" data-key="power" data-t-label="power" aria-label="Sleep">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8M6.3 6.8a8 8 0 1 0 11.4 0"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Mode: buttons -->
+  <section id="mode-buttons" class="mode">
+    <div class="dpad" role="group" data-t-label="dpad" aria-label="Directional pad">
+      <span class="tentacles" aria-hidden="true"></span>
+      <button class="arrow up" data-key="up" data-hold data-t-label="up" aria-label="Up"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+      <button class="arrow right" data-key="right" data-hold data-t-label="right" aria-label="Right"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+      <button class="arrow down" data-key="down" data-hold data-t-label="down" aria-label="Down"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <button class="arrow left" data-key="left" data-hold data-t-label="left" aria-label="Left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <button class="ok" data-key="ok" data-hold>OK</button>
+    </div>
+
+    <div class="row nav">
+      <button class="round" data-key="back" data-t-label="back" aria-label="Back">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7L4 12l5 5M4 12h11a5 5 0 0 1 0 10h-2"/></svg>
+      </button>
+      <button class="round" data-key="home" data-t-label="home" aria-label="Home">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg>
+      </button>
+      <button class="round" data-key="menu" data-t-label="menu" aria-label="Menu">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14"/></svg>
+      </button>
+    </div>
+
+    <div class="row media">
+      <div class="rocker" role="group" data-t-label="volume" aria-label="Volume">
+        <button data-key="voldown" data-hold data-t-label="voldown" aria-label="Volume down"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></button>
+        <svg class="rocker-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/></svg>
+        <button data-key="volup" data-hold data-t-label="volup" aria-label="Volume up"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12M12 6v12"/></svg></button>
+      </div>
+      <button class="round small" data-key="mute" data-t-label="mute" aria-label="Mute">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4zM17 9l5 5M22 9l-5 5"/></svg>
+      </button>
+      <button class="round small" data-key="play" data-t-label="play" aria-label="Play or pause">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14l8-7zM17 5v14M21 5v14"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <!-- Mode: touchpad -->
+  <section id="mode-touchpad" class="mode" hidden>
+    <div id="pad" class="pad">
+      <p class="pad-hint" data-t="padHint">Drag to move. Tap to click.<br>Two fingers to scroll.</p>
+    </div>
+    <div class="row nav">
+      <button class="round" data-key="back" data-t-label="back" aria-label="Back">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7L4 12l5 5M4 12h11a5 5 0 0 1 0 10h-2"/></svg>
+      </button>
+      <button class="round" data-key="home" data-t-label="home" aria-label="Home">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <!-- Mode: keyboard -->
+  <section id="mode-keyboard" class="mode" hidden>
+    <label class="type-label" for="typing" data-t="typeHint">What you type shows up on the TV.</label>
+    <input id="typing" class="typing" type="text" autocomplete="off" autocorrect="off"
+           autocapitalize="off" spellcheck="false" enterkeyhint="send">
+    <div class="row keys">
+      <button class="pill" data-key="backspace" data-t="erase">Erase</button>
+      <button class="pill" data-key="space" data-t="space">Space</button>
+      <button class="pill accent" data-key="enter" data-t="enter">Enter</button>
+    </div>
+    <p id="type-note" class="muted small" role="status"></p>
+  </section>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-mode="buttons" aria-selected="true" data-t="tabButtons">Remote</button>
+    <button role="tab" data-mode="touchpad" aria-selected="false" data-t="tabTouchpad">Touchpad</button>
+    <button role="tab" data-mode="keyboard" aria-selected="false" data-t="tabKeyboard">Keyboard</button>
+  </nav>
+</main>
+
+</body>
+</html>
