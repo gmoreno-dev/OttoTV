@@ -1,11 +1,16 @@
 # Otto TV
 
-Turn an old PC or laptop into a fast, plug-and-play Android Otto TV for any TV.
+Turn an old PC or laptop into a fast, plug-and-play Android TV for any TV.
 Flash a USB stick, plug the computer into the TV over HDMI, try it live, then
 install it.
 
-> Status: **v0.3.10, early development.** Tested on one machine so far:
+> Status: **v0.4.0, early development.** Tested on one machine so far:
 > [Acer HM77 / Ivy Bridge](docs/hardware/acer-hm77-ivybridge.md).
+
+**What it needs:** a 64-bit PC with SSE4.2 (Android 14 requires it: Intel
+Core i3/i5/i7 from 2008-2010 on, AMD from 2011 on; Core 2 Duo, older Pentiums
+and Athlon II/Phenom II won't boot), 2 GB of RAM (4 GB is comfortable) and an
+8 GB USB stick. Installing takes the whole disk.
 
 ## How it works
 
@@ -16,8 +21,10 @@ files that plug into extension points upstream already has.
 
 ```
 USB stick
- ├─ GRUB menu (/boot/grub/grub.cfg)          ← ours: menu, defaults, boot args
+ ├─ GRUB menu (/boot/grub/grub.cfg)          ← ours: menu, Otto theme, boot args
  ├─ /cmdline.txt                              ← ours: boot args for installed systems
+ ├─ initrd (upstream's + a second archive)    ← ours: quiet /init with Otto in
+ │                                               ASCII (tools/patch-initrd.sh)
  ├─ initrd: sources /scripts/* from the boot
  │   media and calls post_detect()
  │   (defined nowhere)                        ← ours: iso/scripts/9-otto
@@ -25,12 +32,14 @@ USB stick
  │      │    ├─ bind-mounts init.sh with our hooks prepended
  │      │    ├─ overlays /system/etc/user_app (add/remove first-boot apps)
  │      │    ├─ bind-mounts key layouts where Esc sends Back
+ │      │    ├─ bind-mounts Otto's boot animation over LineageOS's
  │      │    ├─ bind-mounts /otto on /boot/otto (Android only sees
  │      │    │  the media's /boot folder, so that's where it finds us)
- │      │    └─ hides upstream's setup wizard (overlay whiteouts)
- │      └─ install mode:
- │           └─ adds a step to the Calamares installer that copies
- │              /scripts and /otto to the installed system
+ │      │    └─ hides upstream's setup wizard and updater (whiteouts)
+ │      └─ install mode: makes Calamares Otto TV's installer
+ │           ├─ 4 steps, Otto's branding, Portuguese, GRUB without asking
+ │           ├─ installed boot menu: Otto's entries and theme
+ │           └─ a step that copies /scripts and /otto to the installed system
  └─ Android: /system/etc/init.sh calls
      post_init / post_bootcomplete
      (defined nowhere)                        ← ours: iso/otto/init-hooks.sh
@@ -161,6 +170,11 @@ Ventoy stick.
 The CI workflow lints and tests on every push, and builds the ISO when run by
 hand (Actions → CI → Run workflow).
 
+The images (boot menu, boot animation, installer, app icons) are committed.
+`node tools/brand/make-assets.js` and `python3 tools/brand/grub-theme.py`
+regenerate them from `art/brand` (the design's Otto, in SVG and JavaScript)
+and `art/fonts` (Inter, SIL OFL).
+
 ## Boot options
 
 Uppercase `VAR=value` pairs on the kernel command line become shell variables
@@ -168,16 +182,16 @@ in Android's `init.sh`, which both upstream and our hooks read.
 `EXTRA_KERNEL_ARGS` in `config.env` sets them for the live menu and, through
 `/cmdline.txt`, for installed systems:
 
-| Option              | Default             | Effect |
-|---------------------|---------------------|--------|
-| `OTTO_AUDIO`       | `auto`              | `off` skips HDMI audio detection |
-| `OTTO_LOCALE`      | `pt-BR`             | Default language (a language the user picks wins) |
-| `OTTO_MIRROR`      | `auto`              | `ask` keeps Android's "Mirror to display?" question (from the next boot) |
-| `OTTO_ESC`         | `back`              | `escape` keeps Esc as Esc |
-| `OTTO_IME`         | `auto`              | `tv` always uses the TV keyboard, `hard` never shows one |
-| `OTTO_REMOTE`      | `on`                | `off` doesn't start the phone remote (nor the keyboard shortcuts) |
-| `OTTO_SETUP`       | `ours`              | `wizard` keeps upstream's setup wizard |
-| `SET_TZ_LOCATION`   | `America/Sao_Paulo` | Time zone (upstream option) |
+| Option            | Default             | Effect |
+|-------------------|---------------------|--------|
+| `OTTO_AUDIO`      | `auto`              | `off` skips HDMI audio detection |
+| `OTTO_LOCALE`     | `pt-BR`             | Default language (a language the user picks wins) |
+| `OTTO_MIRROR`     | `auto`              | `ask` keeps Android's "Mirror to display?" question (from the next boot) |
+| `OTTO_ESC`        | `back`              | `escape` keeps Esc as Esc |
+| `OTTO_IME`        | `auto`              | `tv` always uses the TV keyboard, `hard` never shows one |
+| `OTTO_REMOTE`     | `on`                | `off` doesn't start the phone remote (nor the keyboard shortcuts) |
+| `OTTO_SETUP`      | `ours`              | `wizard` keeps upstream's setup wizard |
+| `SET_TZ_LOCATION` | `America/Sao_Paulo` | Time zone (upstream option) |
 
 To try one without rebuilding, press `e` on a menu entry, append it to the
 `linux` line and boot with Ctrl+X.
