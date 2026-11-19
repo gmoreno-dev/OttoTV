@@ -202,27 +202,99 @@ otto_hide_setup_wizard() {
 
 # Install mode boots a small Linux with the Calamares installer, which only
 # copies the system image, kernel, initrd and recovery to disk. Its root is a
-# writable overlay at this point, so we drop in our own Calamares job
-# (installer/otto-payload) and run it right after upstream's gen-img step.
+# writable overlay at this point, so we make it Otto TV's installer:
+#  - our jobs: defaults for the pages we skip, before gen-img (it reads
+#    them), and our files (otto-payload) right after it;
+#  - four steps, like the design: welcome, disk, install, done. No data.img
+#    page, no developer options, no summary, and no bootloader question
+#    (always GRUB) when it starts;
+#  - Otto's branding and Portuguese, erase-the-disk preselected;
+#  - the installed boot menu: Otto TV's entries and theme, 5 s, the PC's
+#    UEFI boot entry named OttoTV;
+#  - its little desktop: no BlissOS logo, readme or wallpaper.
+# The cosmetic steps never stop an installation.
 # Usage: otto_patch_installer <installer root> <our otto folder>
 otto_patch_installer() {
 	local root="$1" payload="$2"
+	local inst="$payload/installer"
+	local cal="$root/etc/calamares"
 	local modules="$root/usr/lib/x86_64-linux-gnu/calamares/modules"
-	local settings="$root/etc/calamares/settings.conf"
+	local settings="$cal/settings.conf"
 
-	[ -d "$payload/installer/otto-payload" ] && [ -f "$settings" ] || return 0
+	[ -d "$inst/otto-payload" ] && [ -f "$settings" ] || return 0
 	grep -q -- '- otto-payload$' "$settings" && return 0
 
 	mkdir -p "$modules" &&
-		cp -r "$payload/installer/otto-payload" "$modules/" &&
-		sed -i 's/^\( *\)- gen-img$/&\n\1- otto-payload/' "$settings" || return 1
-
-	if grep -q -- '- otto-payload$' "$settings"; then
-		otto_msg "installer will copy the Otto TV files"
-	else
+		cp -r "$inst/otto-payload" "$inst/otto-defaults" "$modules/" &&
+		sed -i -e 's/^\( *\)- gen-img$/\1- otto-defaults\n&\n\1- otto-payload/' \
+			-e '/^ *- dataimg$/d' -e '/^ *- options$/d' -e '/^ *- summary$/d' \
+			"$settings" || return 1
+	if ! grep -q -- '- otto-payload$' "$settings"; then
 		otto_msg "WARNING: installer step not added (no gen-img in settings.conf)"
 		return 1
 	fi
+	otto_msg "installer will copy the Otto TV files"
+
+	mkdir -p "$cal/branding" "$cal/scripts"
+	if cp -r "$inst/branding/otto" "$cal/branding/" 2>/dev/null; then
+		sed -i 's/^branding: .*/branding: otto/' "$settings"
+	fi
+	sed -i 's/^initialPartitioningChoice: .*/initialPartitioningChoice: erase/' \
+		"$cal/modules/partition.conf" 2>/dev/null
+
+	# The installed system's boot menu.
+	sed -i 's/^efiBootloaderId: .*/efiBootloaderId: "OttoTV"/' \
+		"$cal/modules/bootloader.conf" 2>/dev/null
+	if cp "$inst/10_otto" "$cal/scripts/10_otto" 2>/dev/null; then
+		chmod 755 "$cal/scripts/10_otto"
+		sed -i 's|^grub_bootcfg: .*|grub_bootcfg: "/etc/calamares/scripts/10_otto"|' \
+			"$cal/modules/bootcfg.conf"
+	fi
+	sed -i -e 's/GRUB_TIMEOUT=10/GRUB_TIMEOUT=5/' \
+		-e "s/GRUB_DISTRIBUTOR=BlissLabs/GRUB_DISTRIBUTOR='Otto TV'/" \
+		-e 's/^\( *\)print("GRUB_TIMEOUT_STYLE=menu", file=grubConf)$/&\n\1print("GRUB_GFXMODE=1366x768,1280x720,1024x768,auto", file=grubConf)/' \
+		"$modules/bootcfg/main.py" 2>/dev/null
+	# bootcfg copies every theme here to the installed /boot/grub/themes.
+	if [ -d "$inst/grub-theme" ]; then
+		rm -rf "$root/usr/share/grub/themes"
+		mkdir -p "$root/usr/share/grub/themes"
+		cp -r "$inst/grub-theme" "$root/usr/share/grub/themes/otto"
+	fi
+	sed -i 's/^LABEL="UEFI Firmware Settings"$/LABEL="Configurações do computador (UEFI)"/' \
+		"$root/etc/grub.d/30_uefi-firmware" 2>/dev/null
+
+	# Starts by itself (from JWM's startup), on GRUB, in Portuguese.
+	sed -i 's/^calamares "\$@"$/LANG=pt_BR.UTF-8 LANGUAGE=pt_BR calamares "$@"/' \
+		"$root/usr/bin/aaropa-calamares" 2>/dev/null
+	mkdir -p "$root/etc/otto" &&
+		cp "$inst/branding/otto/icon.png" "$root/etc/otto/icon.png" 2>/dev/null
+	sed -i -e 's|bash -c /usr/bin/aaropa-calamares|bash -c "/usr/bin/aaropa-calamares grub"|g' \
+		-e 's|label="Install BlissOS"|label="Instalar o Otto TV"|' \
+		-e 's|/etc/bliss/blissos_logo.svg|/etc/otto/icon.png|g' \
+		-e '/label="README"/d' \
+		-e 's|<Background type="[a-z]*">[^<]*</Background>|<Background type="solid">#161B22</Background>|' \
+		"$root/root/.jwmrc" 2>/dev/null
+	sed -i -e 's|^Exec=.*|Exec=/usr/bin/bash -c "/usr/bin/aaropa-calamares grub"|' \
+		-e 's|^Name=.*|Name=Instalar o Otto TV|' \
+		-e 's|^GenericName=.*|GenericName=Instalador do Otto TV|' \
+		-e 's|^Icon=.*|Icon=/etc/otto/icon.png|' \
+		"$root/root/Desktop/calamares.desktop" 2>/dev/null
+	rm -f "$root/root/Desktop/HOW_TO_USE.png" "$root/root/Desktop/readme.desktop"
+	sed -i -e 's/^wallpaper_mode=.*/wallpaper_mode=color\ndesktop_bg=#161b22/' \
+		-e '/^wallpaper=/d' \
+		"$root/root/.config/pcmanfm/default/desktop-items-0.conf" 2>/dev/null
+	return 0
+}
+
+# Otto's boot animation over LineageOS's (it has a light and a dark one).
+otto_boot_animation() {
+	local zip="/mnt/$SRC/otto/bootanimation.zip"
+	local media="${OTTO_ANDROID:-/android}/system/product/media" f
+	[ -f "$zip" ] || return 0
+	for f in bootanimation.zip bootanimation-dark.zip; do
+		[ -f "$media/$f" ] && mount --bind "$zip" "$media/$f"
+	done
+	otto_msg "boot animation: Otto"
 }
 
 post_detect() {
@@ -240,6 +312,7 @@ post_detect() {
 	otto_system_apps
 	otto_user_apps
 	otto_fix_zram
+	otto_boot_animation
 	otto_keylayouts
 	otto_expose_runtime
 	otto_hide_setup_wizard

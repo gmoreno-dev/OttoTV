@@ -49,6 +49,8 @@ if [ -n "$UPSTREAM_ISO_SHA256" ] && [ -z "${OTTO_SKIP_HASH:-}" ]; then
 	log "Checking upstream ISO hash"
 	echo "$UPSTREAM_ISO_SHA256  $UPSTREAM_ISO" | sha256sum -c --quiet - ||
 		die "upstream ISO hash mismatch"
+elif [ -n "${OTTO_SKIP_HASH:-}" ]; then
+	echo "warning: OTTO_SKIP_HASH: not checking the upstream ISO" >&2
 else
 	echo "warning: UPSTREAM_ISO_SHA256 is empty. Pin this build in config.env:" >&2
 	sha256sum "$UPSTREAM_ISO" >&2
@@ -66,6 +68,7 @@ mkdir -p "$STAGE/grub" "$STAGE/otto/user_app" "$STAGE/otto/system_app/OttoConnec
 	"$STAGE/mountpoint" "$CACHE/apks"
 cp -r "$ROOT/iso/scripts" "$STAGE/scripts"
 cp -r "$ROOT/iso/otto/." "$STAGE/otto/"
+sed -i "s/@VERSION@/$VERSION/g" "$STAGE/otto/installer/branding/otto/branding.desc"
 find "$STAGE" -name __pycache__ -prune -exec rm -rf {} +
 
 # Installed systems don't use our GRUB menu: the upstream installer writes

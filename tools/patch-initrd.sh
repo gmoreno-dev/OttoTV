@@ -15,8 +15,9 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 mkdir "$work/root"
-(cd "$work/root" && gzip -dc "$src" | cpio -i --quiet init) ||
-	{ echo "patch-initrd: no /init in $src" >&2; exit 1; }
+# Upstream's names start with "./"; either way it lands in $work/root/init.
+(cd "$work/root" && gzip -dc "$src" | cpio -i --quiet init ./init)
+[ -f "$work/root/init" ] || { echo "patch-initrd: no /init in $src" >&2; exit 1; }
 python3 "$ROOT/tools/patch_initrd_init.py" "$work/root/init"
 cp "$ROOT/art/brand/otto-ascii.txt" "$work/root/otto-ascii.txt"
 chmod 755 "$work/root/init"

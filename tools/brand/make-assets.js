@@ -95,8 +95,6 @@ async function installer(browser) {
   // Welcome page: Otto waving.
   await render(browser, '<svg viewBox="28 22 150 150" width="200" height="200">' + G.pose('wave') + '</svg>',
     path.join(dir, 'welcome.png'), { scale: 2 });
-  await render(browser, '<svg viewBox="20 16 160 160" width="200" height="200">' + G.pose('cheer') + '</svg>',
-    path.join(dir, 'done.png'), { scale: 2 });
   // Slides shown while installing (Installer-slide1..3).
   const phone = '<g transform="rotate(12 146 62)">' + G.P(G.rrect(135, 43, 22, 38, 4.5), '#3A4352') +
     G.P(G.rrect(137.5, 46.5, 17, 29, 2.5), PANEL) + G.P(G.circ(146, 66, 3.4), '#F2B25C') + '</g>';

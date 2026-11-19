@@ -1,0 +1,35 @@
+# Otto TV's look for the installer (Calamares). Copied over upstream's
+# BlissOS branding at install time by iso/scripts/9-otto. Images come from
+# tools/brand/make-assets.js; @VERSION@ is filled in by build.sh.
+---
+componentName:  otto
+welcomeStyleCalamares:   false
+welcomeExpandingLogo:   true
+windowExpanding:    normal
+windowSize: 800px,580px
+windowPlacement: center
+sidebar: widget
+navigation: widget
+
+strings:
+    productName:         Otto TV
+    shortProductName:    Otto TV
+    version:             @VERSION@
+    shortVersion:        @VERSION@
+    versionedName:       Otto TV @VERSION@
+    shortVersionedName:  Otto TV @VERSION@
+    bootloaderEntryName: Otto TV
+
+images:
+    productLogo:         "logo.png"
+    productIcon:         "icon.png"
+    productWelcome:      "welcome.png"
+
+style:
+   SidebarBackground:        "#1D232C"
+   SidebarText:              "#F4F6F9"
+   SidebarTextCurrent:       "#15191F"
+   SidebarBackgroundCurrent: "#F2B25C"
+
+slideshow:               "show.qml"
+slideshowAPI: 2

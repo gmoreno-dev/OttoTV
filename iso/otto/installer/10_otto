@@ -1,0 +1,82 @@
+#!/bin/bash
+# shellcheck disable=SC2086,SC2001,SC2154,SC1091
+set -e
+
+# Otto TV's boot entries for installed systems. Upstream's BlissOS script
+# (etc/calamares/scripts/10_blissos), with Otto TV's name and only the two
+# entries people need: Otto TV, and Otto TV with safe video. Installed in
+# place of upstream's by iso/scripts/9-otto; grub-mkconfig runs it.
+#
+# grub-mkconfig helper script.
+# Copyright (C) 2006,2007,2008,2009  Free Software Foundation, Inc.
+#
+# GRUB is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# GRUB is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GRUB.  If not, see <http://www.gnu.org/licenses/>.
+
+. "$pkgdatadir/grub-mkconfig_lib"
+. /etc/default/grub
+
+export TEXTDOMAIN=grub
+export TEXTDOMAINDIR="${datarootdir}/locale"
+
+CLASS="--class otto --class android --class os"
+OS="Android"
+TITLE="Otto TV"
+
+disk="$(prepare_grub_to_access_device "$GRUB_DEVICE")"
+
+ROOT_DEVICE=$GRUB_DEVICE
+ROOT_UUID=$(${grub_probe} --device "$ROOT_DEVICE" --target=fs_uuid 2>/dev/null)
+
+[ "$ROOT_UUID" ] && ROOT_DEVICE="UUID=$ROOT_UUID"
+
+# android_entry <title> [kernel arguments...]
+android_entry() {
+	local title=$1
+	shift
+	local extra_args=$*
+
+	echo "menuentry '$(echo "$title" | grub_quote)' ${CLASS} \$menuentry_id_option '$OS-${title// /_}-\$SLOT' {"
+
+	save_default_entry | grub_add_tab
+
+	if [ ! "$GRUB_GFXPAYLOAD_LINUX" ]; then
+		echo "	load_video"
+		grep -qx "CONFIG_FB_EFI=y" "${config}" 2>/dev/null &&
+			grep -qx "CONFIG_VT_HW_CONSOLE_BINDING=y" "${config}" 2>/dev/null &&
+			echo "	set gfxpayload=keep"
+	else
+		[ "$GRUB_GFXPAYLOAD_LINUX" = text ] ||
+			echo "	load_video"
+		echo "	set gfxpayload=$GRUB_GFXPAYLOAD_LINUX"
+	fi
+
+	echo "	insmod gzio"
+	echo "$disk" | sed "s/^/$grub_tab/gm"
+	echo "	linux $SRC/kernel\$SLOT \$CMDLINE androidboot.mode=\$MODE $extra_args ROOT=$ROOT_DEVICE SRC=$SRC androidboot.slot_suffix=\$SLOT androidboot.bootctrl_bootcfg=/boot/grub/android.cfg"
+	echo "	initrd $SRC/initrd\$SLOT.img"
+	echo "}
+"
+}
+
+# android.cfg is where BootCTL HAL updates current slot suffix after OTA
+cat <<'EOF2'
+source $prefix/android.cfg
+export SLOT
+export CMDLINE
+export MODE
+EOF2
+
+android_entry "$TITLE"
+# Software rendering, for GPUs the hardware drivers can't handle.
+android_entry "$TITLE em modo de vídeo seguro" nomodeset HWACCEL=0

@@ -1,0 +1,30 @@
+/* Otto TV: light pages (the partition page draws its own colors, which
+ * expect a light background), the dark sidebar from branding.desc, and
+ * the design's amber for the button that moves forward. */
+QWidget {
+    font: 14px;
+}
+QDialogButtonBox {
+    dialogbuttonbox-buttons-have-icons: 0;
+}
+#view-button-next {
+    background-color: #F2B25C;
+    color: #15191F;
+    border: none;
+    border-radius: 16px;
+    padding: 7px 22px;
+    font-weight: bold;
+}
+#view-button-next:disabled {
+    background-color: #E5D3B8;
+    color: #6B6B6B;
+}
+#view-button-back, #view-button-cancel {
+    border-radius: 16px;
+    padding: 7px 18px;
+}
+#debugButton {
+    background-color: none;
+    border: none;
+    color: #1D232C;
+}

@@ -357,7 +357,8 @@ expect "initrd: the art is plain ASCII, 76x20 at most" "ok" \
 mkdir -p "$TMP/ird"
 cp "$FIX/upstream-initrd-init" "$TMP/ird/init"
 echo hello >"$TMP/ird/other"
-(cd "$TMP/ird" && printf '%s\n' init other | cpio -o -H newc --quiet | gzip -9n) >"$TMP/up.img"
+# Named like upstream's, with a leading "./".
+(cd "$TMP/ird" && printf '%s\n' ./init ./other | cpio -o -H newc --quiet | gzip -9n) >"$TMP/up.img"
 "$ROOT/tools/patch-initrd.sh" "$TMP/up.img" "$TMP/new.img"
 size=$(wc -c <"$TMP/up.img")
 expect "initrd: upstream's archive kept byte for byte" "same" \
@@ -369,20 +370,95 @@ expect "initrd: our archive replaces /init and adds the art" "init|otto-ascii.tx
 
 # shellcheck source=iso/scripts/9-otto
 source "$ROOT/iso/scripts/9-otto"
+# Upstream's real installer files, and our folder as build.sh stages it.
 inst="$TMP/install"
-mkdir -p "$inst/etc/calamares"
-cp "$FIX/upstream-calamares-settings.conf" "$inst/etc/calamares/settings.conf"
+cp -r "$FIX/installer" "$inst"
+touch "$inst/root/Desktop/HOW_TO_USE.png" "$inst/root/Desktop/readme.desktop"
+payload="$TMP/payload"
+cp -r "$ROOT/iso/otto" "$payload"
+cp -r "$ROOT/iso/boot/grub/themes/otto" "$payload/installer/grub-theme"
+cal="$inst/etc/calamares"
+mods="$inst/usr/lib/x86_64-linux-gnu/calamares/modules"
 
-otto_patch_installer "$inst" "$ROOT/iso/otto" >/dev/null
-expect "installer: our job runs right after gen-img" \
-	"- gen-img|- otto-payload|- gen-fstab" \
-	"$(grep -A2 -- '- gen-img$' "$inst/etc/calamares/settings.conf" | sed 's/^ *//' | paste -sd'|')"
-expect "installer: job module copied" "yes" \
-	"$([ -f "$inst/usr/lib/x86_64-linux-gnu/calamares/modules/otto-payload/module.desc" ] && echo yes)"
+otto_patch_installer "$inst" "$payload"
+expect "installer: four steps (welcome, disk, install, done)" "welcome|partition|finished" \
+	"$(awk '/^- show:/ { show = 1; next } /^[^ ]/ { show = 0 } show && /^ +- / { sub(/^ *- /, ""); print }' "$cal/settings.conf" | paste -sd'|')"
+expect "installer: defaults before gen-img, our files right after it" \
+	"- otto-defaults|- gen-img|- otto-payload|- gen-fstab" \
+	"$(grep -B1 -A2 -- '- gen-img$' "$cal/settings.conf" | sed 's/^ *//' | paste -sd'|')"
+expect "installer: our jobs are there" "yes|yes" \
+	"$([ -f "$mods/otto-payload/module.desc" ] && echo yes)|$([ -f "$mods/otto-defaults/main.py" ] && echo yes)"
+expect "installer: Otto's branding" "branding: otto|yes" \
+	"$(grep '^branding:' "$cal/settings.conf")|$([ -f "$cal/branding/otto/show.qml" ] && echo yes)"
+expect "installer: erasing the disk is preselected" "initialPartitioningChoice: erase" \
+	"$(grep '^initialPartitioningChoice' "$cal/modules/partition.conf")"
+expect "installer: the PC's UEFI entry is OttoTV" 'efiBootloaderId: "OttoTV"' \
+	"$(grep '^efiBootloaderId' "$cal/modules/bootloader.conf")"
+expect "installer: grub-mkconfig runs our entries" 'grub_bootcfg: "/etc/calamares/scripts/10_otto"|yes' \
+	"$(grep '^grub_bootcfg' "$cal/modules/bootcfg.conf")|$([ -x "$cal/scripts/10_otto" ] && echo yes)"
+expect "installer: 5 s menu, our name and screen modes" \
+	"GRUB_TIMEOUT=5|GRUB_TIMEOUT_STYLE=menu|GRUB_GFXMODE=1366x768,1280x720,1024x768,auto|GRUB_DISTRIBUTOR='Otto TV'" \
+	"$(sed -n 's/^ *print("\(GRUB_[A-Z_]*=[^"]*\)", file=grubConf)$/\1/p' "$mods/bootcfg/main.py" | head -n 4 | paste -sd'|')"
+if python3 -m py_compile "$mods/bootcfg/main.py" "$mods/otto-defaults/main.py" 2>/dev/null; then
+	pass "installer: patched Python still compiles"
+else
+	fail "installer: patched Python still compiles" "syntax error"
+fi
+expect "installer: only our boot menu theme" "otto" "$(ls "$inst/usr/share/grub/themes")"
+expect "installer: firmware entry in Portuguese" 'LABEL="Configurações do computador (UEFI)"' \
+	"$(grep '^LABEL=' "$inst/etc/grub.d/30_uefi-firmware")"
+expect "installer: opens in Portuguese" 'LANG=pt_BR.UTF-8 LANGUAGE=pt_BR calamares "$@"' \
+	"$(tail -n 1 "$inst/usr/bin/aaropa-calamares")"
+expect "installer: starts on GRUB, no bootloader question" "2" \
+	"$(grep -c 'aaropa-calamares grub"' "$inst/root/.jwmrc")"
+# (Its menu still runs /etc/bliss/reboot.sh: a path nobody sees.)
+expect "installer: desktop without BlissOS" "" \
+	"$(grep -i -e 'label="[^"]*bliss' -e 'bliss[a-z_0-9]*\.\(png\|svg\)' -e 'readme' "$inst/root/.jwmrc"
+	grep -i bliss "$inst/root/Desktop/calamares.desktop" "$inst/root/.config/pcmanfm/default/desktop-items-0.conf"
+	ls "$inst/root/Desktop" | grep -v -x calamares.desktop)"
+expect "installer: plain dark wallpaper" "wallpaper_mode=color|desktop_bg=#161b22|solid" \
+	"$(grep -e '^wallpaper_mode' -e '^desktop_bg' "$inst/root/.config/pcmanfm/default/desktop-items-0.conf" | paste -sd'|')|$(sed -n 's/.*<Background type="\([a-z]*\)".*/\1/p' "$inst/root/.jwmrc")"
 
-otto_patch_installer "$inst" "$ROOT/iso/otto" >/dev/null
-expect "installer: patching twice adds the step once" "1" \
-	"$(grep -c -- '- otto-payload$' "$inst/etc/calamares/settings.conf")"
+cp "$cal/settings.conf" "$TMP/settings.once"
+otto_patch_installer "$inst" "$payload"
+expect "installer: patching twice changes nothing" "" "$(diff "$TMP/settings.once" "$cal/settings.conf")"
+
+# Our boot entries, through grub-mkconfig's helpers (mocked).
+mkdir -p "$TMP/mkconfig"
+cat >"$TMP/mkconfig/grub-mkconfig_lib" <<'LIB'
+prepare_grub_to_access_device() { echo "search --no-floppy --fs-uuid --set=root 1234"; }
+grub_quote() { cat; }
+save_default_entry() { echo "savedefault"; }
+grub_add_tab() { sed 's/^/\t/'; }
+LIB
+: >"$TMP/mkconfig/default-grub"
+entries=$(sed "s#/etc/default/grub#$TMP/mkconfig/default-grub#" "$cal/scripts/10_otto" |
+	pkgdatadir="$TMP/mkconfig" GRUB_DEVICE=/dev/sda1 grub_probe=true grub_tab="$(printf '\t')" bash)
+expect "installed menu: Otto TV and safe video, nothing else" "Otto TV|Otto TV em modo de vídeo seguro" \
+	"$(echo "$entries" | sed -n "s/^menuentry '\([^']*\)'.*/\1/p" | paste -sd'|')"
+expect "installed menu: safe video passes nomodeset" "1" \
+	"$(echo "$entries" | grep -c 'androidboot.mode=\$MODE nomodeset HWACCEL=0 ROOT=/dev/sda1')"
+
+# --- Boot animation (initrd hook) -----------------------------------------------
+
+mkdir -p "$TMP/anim/mnt/live/otto" "$TMP/anim/android/system/product/media"
+echo otto >"$TMP/anim/mnt/live/otto/bootanimation.zip"
+touch "$TMP/anim/android/system/product/media/bootanimation.zip" \
+	"$TMP/anim/android/system/product/media/bootanimation-dark.zip"
+: >"$TMP/calls"
+(
+	# shellcheck disable=SC2329  # mock
+	mount() { echo "mount $*" >>"$TMP/calls"; }
+	# The hook reads /mnt/$SRC: point it at the fake one.
+	SRC="../$TMP/anim/mnt/live" OTTO_ANDROID="$TMP/anim/android" otto_boot_animation
+)
+expect "boot animation: Otto over both of upstream's" \
+	"mount --bind /mnt/../$TMP/anim/mnt/live/otto/bootanimation.zip $TMP/anim/android/system/product/media/bootanimation.zip|mount --bind /mnt/../$TMP/anim/mnt/live/otto/bootanimation.zip $TMP/anim/android/system/product/media/bootanimation-dark.zip" \
+	"$(paste -sd'|' "$TMP/calls")"
+expect "boot animation: stored zip with Android's desc.txt" "640 640 24|p 0 0 part0 0 #161B22|36" \
+	"$(unzip -p "$ROOT/iso/otto/bootanimation.zip" desc.txt | paste -sd'|')|$(unzip -l "$ROOT/iso/otto/bootanimation.zip" | grep -c 'part0/[0-9]*\.png')"
+expect "boot animation: frames are stored, not deflated" "0" \
+	"$(unzip -v "$ROOT/iso/otto/bootanimation.zip" | grep -c Defl)"
 
 # --- init.sh and zram fixes (initrd hook) ------------------------------------------
 

@@ -6,7 +6,7 @@ grub-mkfont).
     python3 tools/brand/grub-theme.py     (needs Pillow, fontTools, brotli, grub-mkfont)
 
 The layout follows the design's 1366x768 boot menu (Bootmenu-768): each
-item is a #1D232C pill with 12 px rounded corners, #F2B25C for the chosen
+item is a #1D232C pill with 8 px rounded corners, #F2B25C for the chosen
 one, Inter SemiBold at 28 px for items and 24 px for the hints. GRUB only
 draws images, one font per element and solid colors, so the corners are
 9-slice images (name_nw.png ... name_se.png).
@@ -51,7 +51,7 @@ def write_slices(prefix, radius, color):
         part.save(os.path.join(THEME, "%s_%s.png" % (prefix, name)), optimize=True)
 
 
-def write_font(size, tmp):
+def write_font(size, tmp, metrics=()):
     ttf = os.path.join(tmp, "inter-600.ttf")
     if not os.path.exists(ttf):
         font = TTFont(FONT)
@@ -61,7 +61,7 @@ def write_font(size, tmp):
     out = os.path.join(THEME, "inter-%d.pf2" % size)
     # Latin-1 for Portuguese, the arrows and the middle dot of the hints.
     subprocess.run(
-        ["grub-mkfont", "-n", "Otto", "-s", str(size),
+        ["grub-mkfont", "-n", "Otto", "-s", str(size), *metrics,
          "-r", "0x20-0x7E,0xA0-0xFF,0x2190-0x2193", "-o", out, ttf],
         check=True)
     return out
@@ -69,11 +69,16 @@ def write_font(size, tmp):
 
 def main():
     os.makedirs(THEME, exist_ok=True)
-    write_slices("item", 12, PANEL)
-    write_slices("select", 12, AMBER)
+    # GRUB clips item text to the item's height and draws the pill's corners
+    # outside it: 30 px items (the item font's ascent plus descent) with 8 px
+    # corners make the design's 46 px pills.
+    write_slices("item", 8, PANEL)
+    write_slices("select", 8, AMBER)
     with tempfile.TemporaryDirectory() as tmp:
-        for size in (28, 24):
-            print("wrote", os.path.relpath(write_font(size, tmp), ROOT))
+        # Inter's own ascent (28) leaves room for accented capitals the menu
+        # doesn't use; 23 fits "í" and "ç" and keeps the text centered.
+        print("wrote", os.path.relpath(write_font(28, tmp, ("--asce", "23", "--desc", "7")), ROOT))
+        print("wrote", os.path.relpath(write_font(24, tmp), ROOT))
     print("wrote", os.path.relpath(THEME, ROOT) + "/{item,select}_*.png")
 
 

@@ -14,11 +14,12 @@ terminal-font: "Otto Regular 24"
 	height = 84
 }
 
-# Each item is a 46 px pill, 6 px apart. GRUB draws a pill's 12 px corners
-# outside the item, so items are 22 px tall with 30 px between them (52 px
-# rows), inset 12 px in the list, with the text 12 px further in: the pills
-# span the list's 748 px and the text sits 24 px into them. Room for 4 items
-# (the USB stick's menu); fewer leave no trace, the list has no background.
+# Each item is a 46 px pill, 6 px apart. GRUB draws a pill's 8 px corners
+# outside the item and clips the text to the item, so items are 30 px tall
+# (the font's ascent plus descent) with 22 px between them (52 px rows),
+# inset 8 px in the list, with the text 16 px further in: the pills span the
+# list's 748 px and the text sits 24 px into them. Room for 4 items (the USB
+# stick's menu); fewer leave no trace, the list has no background.
 + boot_menu {
 	left = 50%-374
 	top = 44%+4
@@ -30,12 +31,12 @@ terminal-font: "Otto Regular 24"
 	selected_item_font = "Otto Regular 28"
 	item_color = "#F4F6F9"
 	selected_item_color = "#15191F"
-	item_height = 22
-	item_padding = 12
-	item_spacing = 30
+	item_height = 30
+	item_padding = 8
+	item_spacing = 22
 	icon_width = 0
 	icon_height = 0
-	item_icon_space = 12
+	item_icon_space = 16
 	scrollbar = false
 }
 
