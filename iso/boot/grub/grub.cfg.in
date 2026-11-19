@@ -41,9 +41,9 @@ fi
 
 # Our defaults for the "Advanced options" toggles. Exported variables survive
 # the menu reload each toggle triggers, so the guard keeps them togglable.
-if [ -z "$tvbox_defaults" ]; then
-	set tvbox_defaults=1
-	export tvbox_defaults
+if [ -z "$otto_defaults" ]; then
+	set otto_defaults=1
+	export otto_defaults
 	# Skip the Android TV setup wizard: it hangs looking for a Bluetooth
 	# remote on PCs that have none.
 	set setupwizard="SETUPWIZARD=0"

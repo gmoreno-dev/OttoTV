@@ -1,4 +1,4 @@
-// Package web holds the pages tvbox-remote serves: the phone remote
+// Package web holds the pages otto-remote serves: the phone remote
 // (static/) and the "Connect phone" screen the TV shows (tv.html).
 package web
 

@@ -52,9 +52,9 @@ const TEXTS = {
 const LANG = (navigator.language || 'en').toLowerCase().startsWith('pt') ? 'pt' : 'en';
 const t = (key) => TEXTS[LANG][key] ?? TEXTS.en[key] ?? key;
 
-// A preview build (no TV behind it) sets window.TVBOX_DEMO.
-const DEMO = window.TVBOX_DEMO === true || new URLSearchParams(location.search).has('demo');
-const TOKEN_KEY = 'tvbox.token';
+// A preview build (no TV behind it) sets window.OTTO_DEMO.
+const DEMO = window.OTTO_DEMO === true || new URLSearchParams(location.search).has('demo');
+const TOKEN_KEY = 'otto.token';
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);

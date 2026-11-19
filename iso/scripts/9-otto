@@ -1,5 +1,5 @@
 # shellcheck shell=sh
-# TV Box: initrd-stage hook.
+# Otto TV: initrd-stage hook.
 #
 # The initrd `init` sources every file in /scripts/ of the boot media (or of
 # the install folder, on an installed system), then calls post_detect(),
@@ -10,39 +10,39 @@
 # Everything here must only define functions: this file is sourced before
 # any of that is mounted.
 
-# To the console and to the kernel log, so `dmesg | grep tvbox` on the
+# To the console and to the kernel log, so `dmesg | grep otto` on the
 # running system shows what happened here too.
-tvbox_msg() {
-	echo "tvbox: $*"
-	echo "tvbox: $*" >"${TVBOX_KMSG:-/dev/kmsg}" 2>/dev/null
+otto_msg() {
+	echo "otto: $*"
+	echo "otto: $*" >"${OTTO_KMSG:-/dev/kmsg}" 2>/dev/null
 }
 
 # Prepend our hooks to /system/etc/init.sh by bind-mounting a patched copy
 # over it. Upstream uses the same trick for its own XML overrides, and the
 # bind survives switch_root.
 #
-tvbox_patch_initsh() {
+otto_patch_initsh() {
 	local orig=/android/system/etc/init.sh
-	local hooks="/mnt/$SRC/tvbox/init-hooks.sh"
-	local patched=/tmp/tvbox-init.sh
+	local hooks="/mnt/$SRC/otto/init-hooks.sh"
+	local patched=/tmp/otto-init.sh
 
 	[ -f "$orig" ] && [ -f "$hooks" ] || return 0
-	{ cat "$hooks" && tvbox_hook_bootcomplete <"$orig"; } >"$patched" &&
+	{ cat "$hooks" && otto_hook_bootcomplete <"$orig"; } >"$patched" &&
 		mount --bind "$patched" "$orig" &&
-		tvbox_msg "init.sh hooks installed"
+		otto_msg "init.sh hooks installed"
 }
 
-# Reads upstream's init.sh and adds a call to tvbox_bootcomplete_early as the
+# Reads upstream's init.sh and adds a call to otto_bootcomplete_early as the
 # first line of do_bootcomplete. Upstream ends do_bootcomplete by installing
 # its bundled apps (on every boot in live mode, about 30 seconds) and only
 # then calls post_bootcomplete; the Home key, our keyboard and the phone
 # remote should work as soon as the home screen shows. If upstream changes
 # shape, nothing is added and post_bootcomplete does the work, later.
-tvbox_hook_bootcomplete() {
+otto_hook_bootcomplete() {
 	awk '
 		pending && /^[[:space:]]*[{][[:space:]]*$/ {
 			print
-			print "\ttvbox_bootcomplete_early"
+			print "\totto_bootcomplete_early"
 			pending = 0
 			next
 		}
@@ -56,7 +56,7 @@ tvbox_hook_bootcomplete() {
 # BOOT_IMAGE=(hd96)/kernel that GRUB adds is a shell syntax error: the script
 # dies before it turns zram on, so no machine gets compressed swap. Low-RAM
 # laptops need it most. This makes it skip the same words init.sh skips.
-tvbox_fix_zram_script() {
+otto_fix_zram_script() {
 	awk '
 		!done && /^[[:space:]]*[*]=[*][)][[:space:]]*$/ {
 			match($0, /^[[:space:]]*/)
@@ -69,83 +69,83 @@ tvbox_fix_zram_script() {
 	'
 }
 
-tvbox_fix_zram() {
-	local orig="${TVBOX_ANDROID:-/android}/system/vendor/etc/init.zram.sh"
-	local patched="${TVBOX_TMP:-/tmp}/tvbox-init.zram.sh"
+otto_fix_zram() {
+	local orig="${OTTO_ANDROID:-/android}/system/vendor/etc/init.zram.sh"
+	local patched="${OTTO_TMP:-/tmp}/otto-init.zram.sh"
 
 	[ -f "$orig" ] || return 0
 	if grep -q 'BOOT_IMAGE=' "$orig"; then
 		return 0 # fixed upstream
 	fi
-	tvbox_fix_zram_script <"$orig" >"$patched" &&
+	otto_fix_zram_script <"$orig" >"$patched" &&
 		mount --bind "$patched" "$orig" &&
-		tvbox_msg "zram: fixed upstream's setup script"
+		otto_msg "zram: fixed upstream's setup script"
 }
 
 # Our app (pairing screen, physical keyboard IME) goes in as a system app,
 # so it is there from the first moment instead of after upstream installs
 # its user apps.
-tvbox_system_apps() {
-	local target="${TVBOX_ANDROID:-/android}/system/app"
-	local extra="/mnt/$SRC/tvbox/system_app"
+otto_system_apps() {
+	local target="${OTTO_ANDROID:-/android}/system/app"
+	local extra="/mnt/$SRC/otto/system_app"
 
 	[ -d "$target" ] && [ -d "$extra" ] || return 0
 	mount -t overlay -o "lowerdir=$extra:$target" overlay "$target" &&
-		tvbox_msg "system apps added"
+		otto_msg "system apps added"
 }
 
 
 # Once Android runs, the boot media itself is out of reach: upstream only
 # bind-mounts its /boot folder (GRUB's) on Android's /boot. The ISO carries
-# an empty /boot/tvbox for us, so our folder shows up as /boot/tvbox too,
-# where the Android-side hooks find tvbox-remote. Installed systems get the
+# an empty /boot/otto for us, so our folder shows up as /boot/otto too,
+# where the Android-side hooks find otto-remote. Installed systems get the
 # same folder from our installer step.
-tvbox_expose_runtime() {
-	local mountpoint=/android/boot/tvbox
+otto_expose_runtime() {
+	local mountpoint=/android/boot/otto
 	if [ ! -d "$mountpoint" ]; then
-		tvbox_msg "WARNING: no $mountpoint, the phone remote won't start"
+		otto_msg "WARNING: no $mountpoint, the phone remote won't start"
 		return 1
 	fi
-	mount --bind "/mnt/$SRC/tvbox" "$mountpoint" &&
-		tvbox_msg "files available to Android at /boot/tvbox"
+	mount --bind "/mnt/$SRC/otto" "$mountpoint" &&
+		otto_msg "files available to Android at /boot/otto"
 }
 
 # Reads a key layout (.kl) on stdin and prints it with Esc sending Back.
 # Laptop keyboards have no Back key, and Android TV apps rely on one.
-tvbox_esc_to_back() {
+otto_esc_to_back() {
 	sed -E 's/^([[:space:]]*key[[:space:]]+1[[:space:]]+)ESCAPE([[:space:]].*)?$/\1BACK/'
 }
 
-# Applies tvbox_esc_to_back to the layouts keyboards get by default:
+# Applies otto_esc_to_back to the layouts keyboards get by default:
 # Generic.kl, and Vendor_0001_Product_0001.kl (built-in PS/2 keyboards) when
-# the system ships one. TVBOX_ESC=escape on the kernel command line keeps Esc.
-tvbox_keylayouts() {
+# the system ships one. OTTO_ESC=escape on the kernel command line keeps Esc.
+otto_keylayouts() {
 	local dir=/android/system/usr/keylayout
-	local out=/tmp/tvbox-keylayout
+	local out=/tmp/otto-keylayout
 	local name
 
-	if [ "${TVBOX_ESC:-back}" != back ]; then
-		tvbox_msg "keys: TVBOX_ESC=$TVBOX_ESC, Esc stays Esc"
+	if [ "${OTTO_ESC:-back}" != back ]; then
+		otto_msg "keys: OTTO_ESC=$OTTO_ESC, Esc stays Esc"
 		return 0
 	fi
 	[ -d "$dir" ] || return 0
 	mkdir -p "$out"
 	for name in Generic.kl Vendor_0001_Product_0001.kl; do
 		[ -f "$dir/$name" ] || continue
-		tvbox_esc_to_back <"$dir/$name" >"$out/$name" &&
+		otto_esc_to_back <"$dir/$name" >"$out/$name" &&
 			mount --bind "$out/$name" "$dir/$name" &&
-			tvbox_msg "keys: Esc sends Back ($name)"
+			otto_msg "keys: Esc sends Back ($name)"
 	done
 }
 
 # Upstream installs every APK in /system/etc/user_app on first boot. We
 # lay a read-only overlay on that folder: our extra APKs on top, plus
 # overlayfs whiteouts (0/0 character devices) hiding the APKs we drop.
-tvbox_user_apps() {
+otto_user_apps() {
 	local target=/android/system/etc/user_app
-	local extra="/mnt/$SRC/tvbox/user_app"
-	local removed="/mnt/$SRC/tvbox/remove_apps.txt"
-	local whiteouts=/tmp/tvbox-user_app-whiteouts
+	local extra="/mnt/$SRC/otto/user_app"
+	local removed="/mnt/$SRC/otto/remove_apps.txt"
+	local whiteouts=/tmp/otto-user_app-whiteouts
 	local lower
 
 	[ -d "$target" ] || return 0
@@ -153,23 +153,23 @@ tvbox_user_apps() {
 	if [ -f "$removed" ]; then
 		tr -d '\r' <"$removed" | while read -r apk; do
 			case "$apk" in '' | '#'*) continue ;; esac
-			mknod "$whiteouts/$apk" c 0 0 && tvbox_msg "hiding $apk"
+			mknod "$whiteouts/$apk" c 0 0 && otto_msg "hiding $apk"
 		done
 	fi
 
 	lower="$whiteouts"
 	[ -d "$extra" ] && lower="$lower:$extra"
 	mount -t overlay -o "lowerdir=$lower:$target" overlay "$target" &&
-		tvbox_msg "user apps adjusted"
+		otto_msg "user apps adjusted"
 }
 
 # Hides entries of a read-only system folder behind overlayfs whiteouts.
-# Usage: tvbox_hide <folder> <name>...
-tvbox_hide() {
+# Usage: otto_hide <folder> <name>...
+otto_hide() {
 	local dir="$1" layer name
 	shift
 	[ $# -gt 0 ] && [ -d "$dir" ] || return 0
-	layer="/tmp/tvbox-hide$(echo "$dir" | tr / -)"
+	layer="/tmp/otto-hide$(echo "$dir" | tr / -)"
 	mkdir -p "$layer"
 	for name in "$@"; do
 		mknod "$layer/$name" c 0 0 || return 1
@@ -178,17 +178,17 @@ tvbox_hide() {
 }
 
 # Upstream's setup wizard (LineageOS) opens before the home screen with a
-# Bluetooth accessory search and a LineageOS features page. TV Box replaces
+# Bluetooth accessory search and a LineageOS features page. Otto TV replaces
 # it: Wi-Fi and the phone come from our "Connect phone" screen, Bluetooth
 # pairing stays in Settings, and init-hooks.sh marks setup as done.
-# TVBOX_SETUP=wizard on the kernel command line keeps upstream's wizard.
-tvbox_hide_setup_wizard() {
+# OTTO_SETUP=wizard on the kernel command line keeps upstream's wizard.
+otto_hide_setup_wizard() {
 	local dir app found
-	if [ "${TVBOX_SETUP:-ours}" = wizard ]; then
-		tvbox_msg "setup: TVBOX_SETUP=wizard, keeping upstream's wizard"
+	if [ "${OTTO_SETUP:-ours}" = wizard ]; then
+		otto_msg "setup: OTTO_SETUP=wizard, keeping upstream's wizard"
 		return 0
 	fi
-	local sys="${TVBOX_ANDROID:-/android}/system"
+	local sys="${OTTO_ANDROID:-/android}/system"
 	for dir in "$sys/priv-app" "$sys/system_ext/priv-app" "$sys/product/priv-app"; do
 		found=""
 		for app in "$dir"/*SetupWizard*; do
@@ -196,31 +196,31 @@ tvbox_hide_setup_wizard() {
 		done
 		[ -n "$found" ] || continue
 		# shellcheck disable=SC2086  # one word per app folder
-		tvbox_hide "$dir" $found && tvbox_msg "setup: hid$found"
+		otto_hide "$dir" $found && otto_msg "setup: hid$found"
 	done
 }
 
 # Install mode boots a small Linux with the Calamares installer, which only
 # copies the system image, kernel, initrd and recovery to disk. Its root is a
 # writable overlay at this point, so we drop in our own Calamares job
-# (installer/tvbox-payload) and run it right after upstream's gen-img step.
-# Usage: tvbox_patch_installer <installer root> <our tvbox folder>
-tvbox_patch_installer() {
+# (installer/otto-payload) and run it right after upstream's gen-img step.
+# Usage: otto_patch_installer <installer root> <our otto folder>
+otto_patch_installer() {
 	local root="$1" payload="$2"
 	local modules="$root/usr/lib/x86_64-linux-gnu/calamares/modules"
 	local settings="$root/etc/calamares/settings.conf"
 
-	[ -d "$payload/installer/tvbox-payload" ] && [ -f "$settings" ] || return 0
-	grep -q -- '- tvbox-payload$' "$settings" && return 0
+	[ -d "$payload/installer/otto-payload" ] && [ -f "$settings" ] || return 0
+	grep -q -- '- otto-payload$' "$settings" && return 0
 
 	mkdir -p "$modules" &&
-		cp -r "$payload/installer/tvbox-payload" "$modules/" &&
-		sed -i 's/^\( *\)- gen-img$/&\n\1- tvbox-payload/' "$settings" || return 1
+		cp -r "$payload/installer/otto-payload" "$modules/" &&
+		sed -i 's/^\( *\)- gen-img$/&\n\1- otto-payload/' "$settings" || return 1
 
-	if grep -q -- '- tvbox-payload$' "$settings"; then
-		tvbox_msg "installer will copy the TV Box files"
+	if grep -q -- '- otto-payload$' "$settings"; then
+		otto_msg "installer will copy the Otto TV files"
 	else
-		tvbox_msg "WARNING: installer step not added (no gen-img in settings.conf)"
+		otto_msg "WARNING: installer step not added (no gen-img in settings.conf)"
 		return 1
 	fi
 }
@@ -231,16 +231,16 @@ post_detect() {
 
 	if [ "$INSTALL" ]; then
 		# setup_install moved the boot media from /mnt to /install/cdrom.
-		tvbox_patch_installer /install "/install/cdrom/$SRC/tvbox"
+		otto_patch_installer /install "/install/cdrom/$SRC/otto"
 		return 0
 	fi
 
-	[ -d "/mnt/$SRC/tvbox" ] || return 0
-	tvbox_patch_initsh
-	tvbox_system_apps
-	tvbox_user_apps
-	tvbox_fix_zram
-	tvbox_keylayouts
-	tvbox_expose_runtime
-	tvbox_hide_setup_wizard
+	[ -d "/mnt/$SRC/otto" ] || return 0
+	otto_patch_initsh
+	otto_system_apps
+	otto_user_apps
+	otto_fix_zram
+	otto_keylayouts
+	otto_expose_runtime
+	otto_hide_setup_wizard
 }

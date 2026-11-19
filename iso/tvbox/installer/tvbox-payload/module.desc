@@ -1,8 +1,0 @@
-# Calamares job module: copies the TV Box boot hooks to the installed system.
-# Added to the upstream installer at boot time by iso/scripts/9-tvbox.
----
-type:       "job"
-name:       "tvbox-payload"
-interface:  "python"
-script:     "main.py"
-weight:     2

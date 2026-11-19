@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	u "tvbox/remote/uinput"
+	u "otto/remote/uinput"
 )
 
 func TestStrokes(t *testing.T) {

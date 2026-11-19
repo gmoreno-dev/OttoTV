@@ -1,6 +1,6 @@
-# TV Box
+# Otto TV
 
-Turn an old PC or laptop into a fast, plug-and-play Android TV box for any TV.
+Turn an old PC or laptop into a fast, plug-and-play Android Otto TV for any TV.
 Flash a USB stick, plug the computer into the TV over HDMI, try it live, then
 install it.
 
@@ -9,7 +9,7 @@ install it.
 
 ## How it works
 
-TV Box is built on [LineageOS TV x86](https://github.com/LineageOS-TV-x86)
+Otto TV is built on [LineageOS TV x86](https://github.com/LineageOS-TV-x86)
 (Android TV 14 for PCs). Instead of rebuilding Android, `build.sh` remasters the
 upstream ISO: the 2+ GB system image is reused as is, and we only add small
 files that plug into extension points upstream already has.
@@ -20,29 +20,29 @@ USB stick
  ├─ /cmdline.txt                              ← ours: boot args for installed systems
  ├─ initrd: sources /scripts/* from the boot
  │   media and calls post_detect()
- │   (defined nowhere)                        ← ours: iso/scripts/9-tvbox
+ │   (defined nowhere)                        ← ours: iso/scripts/9-otto
  │      ├─ live/installed boot:
  │      │    ├─ bind-mounts init.sh with our hooks prepended
  │      │    ├─ overlays /system/etc/user_app (add/remove first-boot apps)
  │      │    ├─ bind-mounts key layouts where Esc sends Back
- │      │    ├─ bind-mounts /tvbox on /boot/tvbox (Android only sees
+ │      │    ├─ bind-mounts /otto on /boot/otto (Android only sees
  │      │    │  the media's /boot folder, so that's where it finds us)
  │      │    └─ hides upstream's setup wizard (overlay whiteouts)
  │      └─ install mode:
  │           └─ adds a step to the Calamares installer that copies
- │              /scripts and /tvbox to the installed system
+ │              /scripts and /otto to the installed system
  └─ Android: /system/etc/init.sh calls
      post_init / post_bootcomplete
-     (defined nowhere)                        ← ours: iso/tvbox/init-hooks.sh
+     (defined nowhere)                        ← ours: iso/otto/init-hooks.sh
         ├─ finds the HDMI output with a TV attached and routes audio to it
         ├─ picks the on-screen keyboard (none with a physical keyboard)
-        └─ starts tvbox-remote, the phone remote   ← ours: remote/ (Go)
+        └─ starts otto-remote, the phone remote   ← ours: remote/ (Go)
 ```
 
 ### Phone remote
 
 ```
- phone browser ──── http + WebSocket on the home Wi-Fi ────▶ tvbox-remote (root)
+ phone browser ──── http + WebSocket on the home Wi-Fi ────▶ otto-remote (root)
  (iPhone or Android,                                          ├─ serves the remote page
   nothing to install)                                         ├─ pairs phones (QR or PIN)
                                                               └─ /dev/uinput: virtual keyboard
@@ -51,7 +51,7 @@ USB stick
 ```
 
 Android won't let an app type into other apps, but the boot hooks run as
-root, so `tvbox-remote` creates virtual input devices through uinput
+root, so `otto-remote` creates virtual input devices through uinput
 instead. To Android they look like a USB keyboard and mouse, so the remote
 works on every screen, system settings and dialogs included.
 
@@ -65,7 +65,7 @@ reach it through DNS rebinding.
 **Live and installed systems behave the same.** The upstream installer only
 copies the system image, kernel, initrd and recovery to disk, so on its own it
 would leave our files behind. Two things carry them over: our installer step
-copies `/scripts` and `/tvbox` next to the installed kernel (where the
+copies `/scripts` and `/otto` next to the installed kernel (where the
 installed initrd looks for `/scripts`), and the installer writes the first
 line of `/cmdline.txt` into the installed boot entries.
 
@@ -93,7 +93,7 @@ moving to a new upstream release is mostly bumping the ISO hash.
   in menus and does nothing in a text field, so in text fields that key is
   turned back into Enter; the remote's own OK is left alone. Remote-only
   setups keep the TV keyboard. Key decisions are logged:
-  `adb logcat -s TVBoxKeyboard`.
+  `adb logcat -s OttoKeyboard`.
 - **The laptop screen goes dark when you want.** A button on the phone
   remote (and the laptop's own display Fn key, where it sends one) turns
   the laptop's screen dark while the TV is the screen. The choice is saved,
@@ -102,10 +102,10 @@ moving to a new upstream release is mostly bumping the ISO hash.
 - **The TV shows the picture as soon as it's plugged in.** Android 14 keeps
   an HDMI screen dark until someone answers "Mirror to display?", asked on
   the laptop's own screen (unseen with that screen dark or the lid closed).
-  TV Box skips the question; `TVBOX_MIRROR=ask` brings it back.
+  Otto TV skips the question; `OTTO_MIRROR=ask` brings it back.
 - **Compressed memory (zram) that actually turns on.** Upstream's zram
   script dies on the `BOOT_IMAGE=(hd96)/kernel` GRUB adds to the command
-  line, so no machine got it. TV Box fixes the script at boot; it matters
+  line, so no machine got it. Otto TV fixes the script at boot; it matters
   most on laptops with 2 to 4 GB of RAM.
 - **Ready when the home screen shows.** The Home key, the keyboard and the
   phone remote come up first thing at boot complete, before upstream
@@ -126,7 +126,7 @@ moving to a new upstream release is mostly bumping the ISO hash.
   camera, game key mapper).
 - **Straight to the point on first boot.** Upstream's setup wizard (a
   Bluetooth accessory search, then a LineageOS features page) is hidden.
-  TV Box's own first-run screen asks for Wi-Fi when the TV is offline, then
+  Otto TV's own first-run screen asks for Wi-Fi when the TV is offline, then
   shows the phone remote's QR code; Bluetooth pairing is one button away
   instead of a step everyone has to sit through.
 - **Brazilian defaults.** Portuguese and `America/Sao_Paulo`, both
@@ -140,7 +140,7 @@ moving to a new upstream release is mostly bumping the ISO hash.
 ## Build
 
 Needs Linux (WSL works) with `xorriso`, `curl`, `python3`, Go, a JDK and a
-slice of the Android SDK (for TV Box's own 30 KB app: the "Connect phone"
+slice of the Android SDK (for Otto TV's own 30 KB app: the "Connect phone"
 screen and the physical-keyboard keyboard):
 
 ```sh
@@ -150,11 +150,11 @@ tools/setup-android-sdk.sh && export ANDROID_HOME=~/android-sdk
 ```
 
 The TV app is built without Gradle (`tools/build-tv-app.sh`: aapt2, javac,
-d8, apksigner), and signed with a key kept in `cache/tvapp.keystore`.
-`TVBOX_PREBUILT=<dir>` takes `tvbox-remote` and `app.tvbox.connect.apk` from a
+d8, apksigner), and signed with a key kept in `cache/otto.keystore`.
+`OTTO_PREBUILT=<dir>` takes `otto-remote` and `app.ottotv.connect.apk` from a
 folder instead of compiling them.
 
-The result is `out/tvbox-<version>.iso`, its `.sha256` and its `.apps.lock`.
+The result is `out/otto-<version>.iso`, its `.sha256` and its `.apps.lock`.
 Write the ISO to a USB stick with Rufus, balenaEtcher or `dd`, or copy it to a
 Ventoy stick.
 
@@ -170,13 +170,13 @@ in Android's `init.sh`, which both upstream and our hooks read.
 
 | Option              | Default             | Effect |
 |---------------------|---------------------|--------|
-| `TVBOX_AUDIO`       | `auto`              | `off` skips HDMI audio detection |
-| `TVBOX_LOCALE`      | `pt-BR`             | Default language (a language the user picks wins) |
-| `TVBOX_MIRROR`      | `auto`              | `ask` keeps Android's "Mirror to display?" question (from the next boot) |
-| `TVBOX_ESC`         | `back`              | `escape` keeps Esc as Esc |
-| `TVBOX_IME`         | `auto`              | `tv` always uses the TV keyboard, `hard` never shows one |
-| `TVBOX_REMOTE`      | `on`                | `off` doesn't start the phone remote (nor the keyboard shortcuts) |
-| `TVBOX_SETUP`       | `ours`              | `wizard` keeps upstream's setup wizard |
+| `OTTO_AUDIO`       | `auto`              | `off` skips HDMI audio detection |
+| `OTTO_LOCALE`      | `pt-BR`             | Default language (a language the user picks wins) |
+| `OTTO_MIRROR`      | `auto`              | `ask` keeps Android's "Mirror to display?" question (from the next boot) |
+| `OTTO_ESC`         | `back`              | `escape` keeps Esc as Esc |
+| `OTTO_IME`         | `auto`              | `tv` always uses the TV keyboard, `hard` never shows one |
+| `OTTO_REMOTE`      | `on`                | `off` doesn't start the phone remote (nor the keyboard shortcuts) |
+| `OTTO_SETUP`       | `ours`              | `wizard` keeps upstream's setup wizard |
 | `SET_TZ_LOCATION`   | `America/Sao_Paulo` | Time zone (upstream option) |
 
 To try one without rebuilding, press `e` on a menu entry, append it to the
@@ -200,7 +200,7 @@ against a fake keyboard).
 `tools/device/input-test.sh` collects input diagnostics from a running box
 and tries the keyboard fixes live, without a new ISO.
 `tools/device/update.sh` updates an installed system to a new build over
-ADB, without reinstalling: the build writes `out/tvbox-<version>-update.tar`
+ADB, without reinstalling: the build writes `out/otto-<version>-update.tar`
 with just our files. `tools/device/baseline.sh` measures a box (boot time, RAM, app start times,
 home screen smoothness, CPU, storage and Wi-Fi), so every optimization is
 compared against numbers from the same machine; `baseline.sh video` measures
@@ -209,7 +209,7 @@ what playback costs while a video plays.
 Debugging on a device goes through ADB over the network: enable developer
 options, rooted debugging and network debugging, then
 `adb connect <ip>:5555 && adb root`. Our hooks log to the kernel log
-(`adb shell dmesg | grep tvbox`) and to logcat (`adb logcat -s tvbox`).
+(`adb shell dmesg | grep otto`) and to logcat (`adb logcat -s otto`).
 
 ## Known gaps
 
@@ -247,6 +247,6 @@ options, rooted debugging and network debugging, then
 ## Credits
 
 Built on [LineageOS TV x86](https://github.com/LineageOS-TV-x86), which builds
-on LineageOS, [Bliss OS](https://blissos.org) and Android-x86. TV Box only adds
+on LineageOS, [Bliss OS](https://blissos.org) and Android-x86. Otto TV only adds
 boot-time configuration on top of their work. Bundled apps come from
 [F-Droid](https://f-droid.org) under their own open-source licenses.

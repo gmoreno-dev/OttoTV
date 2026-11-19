@@ -1,29 +1,29 @@
 #!/system/bin/sh
-# Updates TV Box's own files on an installed system, without reinstalling.
+# Updates Otto TV's own files on an installed system, without reinstalling.
 #
 #   adb root
-#   adb push tvbox-<version>-update.tar update.sh /data/local/tmp/
-#   adb shell sh /data/local/tmp/update.sh /data/local/tmp/tvbox-<version>-update.tar
+#   adb push otto-<version>-update.tar update.sh /data/local/tmp/
+#   adb shell sh /data/local/tmp/update.sh /data/local/tmp/otto-<version>-update.tar
 #   adb reboot
 #
-# The installer put /scripts and /tvbox next to the kernel on the install
+# The installer put /scripts and /otto next to the kernel on the install
 # partition, and the initrd reads them from there on every boot. This mounts
 # that partition a second time, replaces our files in /scripts and swaps
-# /tvbox for the new one. It keeps tvbox/user_app (those apps are installed
-# already) and leaves the old folder as tvbox.old until the next update: the
+# /otto for the new one. It keeps otto/user_app (those apps are installed
+# already) and leaves the old folder as otto.old until the next update: the
 # running system still uses it. Android itself, your apps and your settings
 # aren't touched.
 
 TAR=$1
-CMDLINE=${TVBOX_CMDLINE:-/proc/cmdline}
-MNT=${TVBOX_MNT:-/data/local/tmp/tvbox-root}
+CMDLINE=${OTTO_CMDLINE:-/proc/cmdline}
+MNT=${OTTO_MNT:-/data/local/tmp/otto-root}
 
 fail() {
 	echo "erro: $*"
 	exit 1
 }
 
-[ -n "$TAR" ] && [ -f "$TAR" ] || fail "uso: sh update.sh <tvbox-VERSAO-update.tar>"
+[ -n "$TAR" ] && [ -f "$TAR" ] || fail "uso: sh update.sh <otto-VERSAO-update.tar>"
 [ "$(id -u)" = 0 ] || fail "precisa de root: rode 'adb root', conecte de novo e repita"
 grep -q 'androidboot.live=true' "$CMDLINE" &&
 	fail "isto e um sistema live (pendrive): nao ha nada instalado para atualizar"
@@ -46,34 +46,34 @@ mount -t ext4 "$dev" "$MNT" 2>/dev/null || mount "$dev" "$MNT" || fail "nao cons
 trap 'sync; umount "$MNT" 2>/dev/null' EXIT
 
 target="$MNT$src"
-[ -f "$target/scripts/9-tvbox" ] && [ -d "$target/tvbox" ] ||
-	fail "nao achei os arquivos do TV Box em $dev$src"
+[ -f "$target/scripts/9-otto" ] && [ -d "$target/otto" ] ||
+	fail "nao achei os arquivos do Otto TV em $dev$src"
 
-new="$target/.tvbox-update"
+new="$target/.otto-update"
 rm -rf "$new"
 mkdir -p "$new" || fail "sem espaco em $dev?"
 tar -xf "$TAR" -C "$new" || fail "nao consegui abrir $TAR"
-[ -f "$new/scripts/9-tvbox" ] && [ -d "$new/tvbox" ] || fail "$TAR nao parece uma atualizacao do TV Box"
+[ -f "$new/scripts/9-otto" ] && [ -d "$new/otto" ] || fail "$TAR nao parece uma atualizacao do Otto TV"
 
-version() { "$1/tvbox/remote/tvbox-remote" -version 2>/dev/null || echo "?"; }
+version() { "$1/otto/remote/otto-remote" -version 2>/dev/null || echo "?"; }
 old_version=$(version "$target")
 new_version=$(version "$new")
 
 # /scripts may hold other people's hooks too: only our files are replaced.
 cp "$new"/scripts/* "$target/scripts/" || fail "nao consegui copiar os scripts"
 
-# /tvbox is all ours. The previous update's leftovers are no longer in use
+# /otto is all ours. The previous update's leftovers are no longer in use
 # (this boot runs from the current folder), the current one still is.
-rm -rf "$target/tvbox.old"
-if [ -d "$target/tvbox/user_app" ] && [ ! -d "$new/tvbox/user_app" ]; then
-	mv "$target/tvbox/user_app" "$new/tvbox/user_app" || fail "nao consegui manter tvbox/user_app"
+rm -rf "$target/otto.old"
+if [ -d "$target/otto/user_app" ] && [ ! -d "$new/otto/user_app" ]; then
+	mv "$target/otto/user_app" "$new/otto/user_app" || fail "nao consegui manter otto/user_app"
 fi
-mv "$target/tvbox" "$target/tvbox.old" || fail "nao consegui trocar a pasta tvbox"
-if ! mv "$new/tvbox" "$target/tvbox"; then
-	mv "$target/tvbox.old" "$target/tvbox"
-	fail "nao consegui trocar a pasta tvbox (a antiga foi mantida)"
+mv "$target/otto" "$target/otto.old" || fail "nao consegui trocar a pasta otto"
+if ! mv "$new/otto" "$target/otto"; then
+	mv "$target/otto.old" "$target/otto"
+	fail "nao consegui trocar a pasta otto (a antiga foi mantida)"
 fi
 rm -rf "$new"
 
-echo "TV Box atualizado: $old_version -> $new_version ($dev$src)"
+echo "Otto TV atualizado: $old_version -> $new_version ($dev$src)"
 echo "Reinicie para usar: adb reboot"

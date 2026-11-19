@@ -32,8 +32,8 @@ OUT=/data/local/tmp/crash.txt
 	for f in /sys/fs/pstore/*; do
 		[ -f "$f" ] && tail -n 60 "$f"
 	done
-	echo "===== tvbox"
-	dmesg | grep 'tvbox:'
+	echo "===== otto"
+	dmesg | grep 'otto:'
 } >"$OUT" 2>&1
 echo "Pronto. Puxe o arquivo:"
 echo "  adb pull $OUT"

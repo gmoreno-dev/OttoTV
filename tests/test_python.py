@@ -70,9 +70,9 @@ class InstallerJobTest(unittest.TestCase):
         self.media = tmp / "cdrom"
         self.target = tmp / "target"
         (self.media / "scripts").mkdir(parents=True)
-        (self.media / "scripts" / "9-tvbox").write_text("hook")
-        (self.media / "tvbox" / "user_app").mkdir(parents=True)
-        (self.media / "tvbox" / "init-hooks.sh").write_text("hooks")
+        (self.media / "scripts" / "9-otto").write_text("hook")
+        (self.media / "otto" / "user_app").mkdir(parents=True)
+        (self.media / "otto" / "init-hooks.sh").write_text("hooks")
         self.target.mkdir()
 
         storage = {"rootMountPoint": str(self.target)}
@@ -81,8 +81,8 @@ class InstallerJobTest(unittest.TestCase):
         fake.utils = types.SimpleNamespace(debug=lambda *_: None)
         fake.job = types.SimpleNamespace(setprogress=lambda *_: None)
         sys.modules["libcalamares"] = fake
-        self.job = load("tvbox_payload",
-                        ROOT / "iso" / "tvbox" / "installer" / "tvbox-payload" / "main.py")
+        self.job = load("otto_payload",
+                        ROOT / "iso" / "otto" / "installer" / "otto-payload" / "main.py")
         self.job.SOURCE_ROOT = str(self.media)
 
     def tearDown(self):
@@ -91,19 +91,19 @@ class InstallerJobTest(unittest.TestCase):
 
     def test_copies_payload_to_installed_system(self):
         self.assertIsNone(self.job.run())
-        self.assertEqual((self.target / "scripts" / "9-tvbox").read_text(), "hook")
-        self.assertEqual((self.target / "tvbox" / "init-hooks.sh").read_text(), "hooks")
-        # The mount point our initrd hook binds /tvbox to.
-        self.assertTrue((self.target / "boot" / "tvbox").is_dir())
+        self.assertEqual((self.target / "scripts" / "9-otto").read_text(), "hook")
+        self.assertEqual((self.target / "otto" / "init-hooks.sh").read_text(), "hooks")
+        # The mount point our initrd hook binds /otto to.
+        self.assertTrue((self.target / "boot" / "otto").is_dir())
 
     def test_reinstall_replaces_old_payload(self):
-        (self.target / "tvbox").mkdir()
-        (self.target / "tvbox" / "stale.txt").write_text("old")
+        (self.target / "otto").mkdir()
+        (self.target / "otto" / "stale.txt").write_text("old")
         self.assertIsNone(self.job.run())
-        self.assertFalse((self.target / "tvbox" / "stale.txt").exists())
+        self.assertFalse((self.target / "otto" / "stale.txt").exists())
 
     def test_missing_payload_is_an_error(self):
-        (self.media / "scripts" / "9-tvbox").unlink()
+        (self.media / "scripts" / "9-otto").unlink()
         (self.media / "scripts").rmdir()
         self.assertIsNotNone(self.job.run())
 

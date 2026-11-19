@@ -3,9 +3,9 @@
 // "Connect phone" screen on the TV, which is also the first-run screen.
 // Offline it asks for Wi-Fi first and reloads into the QR code once the TV
 // is on a network; online it switches to a confirmation when a phone pairs.
-// window.TVBoxApp is the TV app's bridge (tvapp/, ConnectActivity).
+// window.OttoApp is the TV app's bridge (tvapp/, ConnectActivity).
 const shownAt = Date.now();
-const app = window.TVBoxApp;
+const app = window.OttoApp;
 const buttons = Array.from(document.querySelectorAll('[data-action]'));
 
 buttons.forEach((b) => {

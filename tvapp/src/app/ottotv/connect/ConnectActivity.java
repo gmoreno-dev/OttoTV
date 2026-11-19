@@ -1,4 +1,4 @@
-package app.tvbox.connect;
+package app.ottotv.connect;
 
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
@@ -14,8 +14,8 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 /**
- * Shows the "Connect phone" screen that tvbox-remote serves on the TV, which
- * is also TV Box's first-run screen (Wi-Fi first, then the phone). All the UI
+ * Shows the "Connect phone" screen that otto-remote serves on the TV, which
+ * is also Otto TV's first-run screen (Wi-Fi first, then the phone). All the UI
  * lives in that page; this app gives it a launcher tile, a full screen and a
  * small bridge to system settings. If the service is still starting, it
  * keeps retrying.
@@ -38,8 +38,8 @@ public class ConnectActivity extends Activity {
         web = new WebView(this);
         web.setBackgroundColor(0xFF1A2130);
         web.getSettings().setJavaScriptEnabled(true);
-        // The page calls TVBoxApp.close() once a phone has connected.
-        web.addJavascriptInterface(new Bridge(this), "TVBoxApp");
+        // The page calls OttoApp.close() once a phone has connected.
+        web.addJavascriptInterface(new Bridge(this), "OttoApp");
         web.setWebViewClient(new Client(handler, new Reload(web)));
         setContentView(web);
         web.loadUrl(PAGE);
@@ -68,7 +68,7 @@ public class ConnectActivity extends Activity {
         super.onDestroy();
     }
 
-    /** Retries while tvbox-remote is still starting. */
+    /** Retries while otto-remote is still starting. */
     static final class Client extends WebViewClient {
         private final Handler handler;
         private final Runnable reload;

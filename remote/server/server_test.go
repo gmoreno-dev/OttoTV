@@ -15,7 +15,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 
-	u "tvbox/remote/uinput"
+	u "otto/remote/uinput"
 )
 
 func newTestServer(t *testing.T) (*Server, *recorder) {

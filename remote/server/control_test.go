@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	u "tvbox/remote/uinput"
+	u "otto/remote/uinput"
 )
 
 // recorder stands in for the virtual keyboard and mouse.

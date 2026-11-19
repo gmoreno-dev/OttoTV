@@ -1,6 +1,6 @@
-# APKs from upstream's /system/etc/user_app that a TV box doesn't need.
+# APKs from upstream's /system/etc/user_app that a Otto TV doesn't need.
 # One file name per line, as listed by `adb shell ls /system/etc/user_app`.
-# Hidden at boot by 9-tvbox, so they are never installed.
+# Hidden at boot by 9-otto, so they are never installed.
 
 # Root manager: not something to hand every user by default.
 kernelsu.apk

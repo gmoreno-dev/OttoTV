@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- TV Box's own app:
+<!-- Otto TV's own app:
      - "Connect phone": a thin full-screen shell around the pairing screen
-       that tvbox-remote serves on the TV itself (see remote/web/tv.html).
+       that otto-remote serves on the TV itself (see remote/web/tv.html).
      - "Physical keyboard": an invisible keyboard for when one is plugged in,
        where Enter does what the TV keyboard's "›" button does. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="app.tvbox.connect">
+    package="app.ottotv.connect">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-feature android:name="android.software.leanback" android:required="false" />

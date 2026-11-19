@@ -22,8 +22,8 @@ Upstream image: LineageOS TV x86 21.0 (Android 14), `x86_64_tv_go`, built 2026-0
 | Graphics, HDMI out   | ✅ | Mirrored at native resolution on both screens |
 | Network              | ✅ | ~4 MB/s (~32 Mbps) on 2.4 GHz Wi-Fi |
 | Video playback       | ✅ | A movie in Stremio played smoothly |
-| Audio over HDMI      | ⚠️ → ✅ | Silent by default, fixed by the TV Box audio hook (below) |
-| First-boot setup     | ⚠️ | Hangs on "Searching for accessories" (Bluetooth remote); Esc skips it. TV Box disables the wizard. |
+| Audio over HDMI      | ⚠️ → ✅ | Silent by default, fixed by the Otto TV audio hook (below) |
+| First-boot setup     | ⚠️ | Hangs on "Searching for accessories" (Bluetooth remote); Esc skips it. Otto TV disables the wizard. |
 | Alt+F1 console       | ❌ | Stays blank even with `androidboot.enable_console=1`; use ADB instead |
 
 ## The HDMI audio investigation
@@ -47,6 +47,6 @@ Symptom: sound always came out of the laptop speakers, never the TV.
 6. Fix: `setprop hal.audio.primary.hdmi 1` + `setprop hal.audio.out.hdmi pcmC0D3p`.
    Sound on the TV.
 
-The audio hook in `iso/tvbox/init-hooks.sh` does this automatically on every
+The audio hook in `iso/otto/init-hooks.sh` does this automatically on every
 boot by reading the HDMI jack controls, so no device number is hard-coded.
 The raw dumps are kept as test fixtures in `tests/fixtures/`.

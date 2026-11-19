@@ -9,7 +9,7 @@
 //	               laptop sends one
 //
 // Esc (Back) and the Windows key (Home) need no help: the key layouts map
-// them, see iso/scripts/9-tvbox.
+// them, see iso/scripts/9-otto.
 package hotkeys
 
 import (

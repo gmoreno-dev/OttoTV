@@ -1,4 +1,4 @@
-module tvbox/remote
+module otto/remote
 
 go 1.23
 

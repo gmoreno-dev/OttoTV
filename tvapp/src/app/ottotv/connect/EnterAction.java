@@ -1,4 +1,4 @@
-package app.tvbox.connect;
+package app.ottotv.connect;
 
 import android.text.InputType;
 import android.view.KeyEvent;

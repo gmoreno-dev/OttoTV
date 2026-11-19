@@ -1,0 +1,8 @@
+# Calamares job module: copies the Otto TV boot hooks to the installed system.
+# Added to the upstream installer at boot time by iso/scripts/9-otto.
+---
+type:       "job"
+name:       "otto-payload"
+interface:  "python"
+script:     "main.py"
+weight:     2

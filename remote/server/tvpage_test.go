@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"tvbox/remote/web"
+	"otto/remote/web"
 )
 
 // The real "Connect phone" page: offline it is the first-run Wi-Fi step,

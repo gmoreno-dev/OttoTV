@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	u "tvbox/remote/uinput"
+	u "otto/remote/uinput"
 )
 
 // Keys is what the server needs from a keyboard (uinput.Keyboard in

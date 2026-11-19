@@ -1,6 +1,6 @@
-// tvbox-remote turns a phone into the TV's remote control.
+// otto-remote turns a phone into the TV's remote control.
 //
-// It runs as root on the TV box (started by init-hooks.sh), creates a
+// It runs as root on the Otto TV (started by init-hooks.sh), creates a
 // virtual keyboard and mouse through uinput, and serves a web page the phone
 // opens by scanning a QR code: no app to install, so iPhones work too.
 package main
@@ -22,11 +22,11 @@ import (
 	"syscall"
 	"time"
 
-	"tvbox/remote/hotkeys"
-	"tvbox/remote/panel"
-	"tvbox/remote/server"
-	"tvbox/remote/uinput"
-	"tvbox/remote/web"
+	"otto/remote/hotkeys"
+	"otto/remote/panel"
+	"otto/remote/server"
+	"otto/remote/uinput"
+	"otto/remote/web"
 )
 
 // Set at build time: go build -ldflags "-X main.productName=..."
@@ -37,7 +37,7 @@ var (
 
 func main() {
 	port := flag.Int("port", 8686, "HTTP port")
-	state := flag.String("state", "/data/misc/tvbox", "folder for the pairing token")
+	state := flag.String("state", "/data/misc/otto", "folder for the pairing token")
 	uinputPath := flag.String("uinput", "/dev/uinput", "uinput device")
 	name := flag.String("name", productName, "name shown on the phone")
 	useHotkeys := flag.Bool("hotkeys", true, "keyboard shortcuts: Alt+F4 closes the app, Ctrl+Alt+Del opens the power menu")
@@ -48,7 +48,7 @@ func main() {
 		return
 	}
 	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
-	log.SetPrefix("tvbox-remote: ")
+	log.SetPrefix("otto-remote: ")
 	log.Printf("starting %s", version)
 
 	pairing, err := server.LoadPairing(*state)
@@ -64,15 +64,15 @@ func main() {
 	}
 	// Without input devices the page still works and tells the phone why
 	// nothing happens on the TV.
-	// Device names are internal (init-hooks.sh skips "TV Box Remote*" when it
+	// Device names are internal (init-hooks.sh skips "Otto Remote*" when it
 	// looks for a physical keyboard), so they keep the old name for now.
-	if kb, err := uinput.NewKeyboard(*uinputPath, "TV Box Remote Keyboard"); err != nil {
+	if kb, err := uinput.NewKeyboard(*uinputPath, "Otto Remote Keyboard"); err != nil {
 		log.Printf("virtual keyboard: %v", err)
 	} else {
 		defer kb.Close()
 		srv.Keys = kb
 	}
-	if m, err := uinput.NewMouse(*uinputPath, "TV Box Remote Mouse"); err != nil {
+	if m, err := uinput.NewMouse(*uinputPath, "Otto Remote Mouse"); err != nil {
 		log.Printf("virtual mouse: %v", err)
 	} else {
 		defer m.Close()
@@ -119,7 +119,7 @@ func main() {
 		w := &hotkeys.Watcher{
 			SysDir: "/sys/class/input",
 			DevDir: "/dev/input",
-			Skip:   func(name string) bool { return strings.HasPrefix(name, "TV Box Remote") },
+			Skip:   func(name string) bool { return strings.HasPrefix(name, "Otto Remote") },
 			Handle: func(a hotkeys.Action) {
 				log.Printf("hotkeys: %v", a)
 				android.Do(a)

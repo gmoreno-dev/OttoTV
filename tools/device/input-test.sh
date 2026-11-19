@@ -3,14 +3,14 @@
 #
 #   adb root && adb push tools/device/input-test.sh /data/local/tmp/
 #   adb shell sh /data/local/tmp/input-test.sh
-#   adb pull /data/local/tmp/tvbox-input.txt
+#   adb pull /data/local/tmp/otto-input.txt
 #   adb shell "stop; start"     # restarts the UI so the new key map loads
 #
 # Everything it changes is temporary: a reboot undoes it.
 #   - on-screen keyboard hidden while a physical keyboard is present
 #   - Esc on the built-in keyboard sends Back
 
-OUT=/data/local/tmp/tvbox-input.txt
+OUT=/data/local/tmp/otto-input.txt
 exec 3>&1 >"$OUT" 2>&1
 say() { echo "$*" >&3; }
 section() { echo; echo "===== $* ====="; }
@@ -56,8 +56,8 @@ for p in com.aurora.store org.fdroid.fdroid; do
 	echo "$p: $(appops get "$p" REQUEST_INSTALL_PACKAGES)"
 done
 
-section tvbox
-dmesg | grep tvbox
+section otto
+dmesg | grep otto
 
 # --- Live trial 1: no on-screen keyboard while a physical one is present ----
 section trial-ime
@@ -73,7 +73,7 @@ kl=$(dumpsys input | awk '
 [ -f "$kl" ] || kl=/system/usr/keylayout/Generic.kl
 echo "laptop keyboard layout file: $kl"
 
-dir=/data/local/tmp/tvbox-kl
+dir=/data/local/tmp/otto-kl
 mkdir -p "$dir"
 new="$dir/$(basename "$kl")"
 sed -E 's/^key[[:space:]]+1[[:space:]]+ESCAPE.*/key 1     BACK/' "$kl" >"$new"
@@ -85,10 +85,10 @@ if mount -o bind "$new" "$kl"; then
 	echo "bind mounted $new over $kl"
 	grep -nE '^key[[:space:]]+1[[:space:]]' "$kl"
 	say "Pronto. Agora puxe o arquivo e reinicie a interface:"
-	say "  adb pull /data/local/tmp/tvbox-input.txt"
+	say "  adb pull /data/local/tmp/otto-input.txt"
 	say "  adb shell \"stop; start\""
 else
 	echo "bind mount failed"
 	say "Coletei as informacoes, mas nao consegui aplicar o teste do Esc."
-	say "  adb pull /data/local/tmp/tvbox-input.txt"
+	say "  adb pull /data/local/tmp/otto-input.txt"
 fi

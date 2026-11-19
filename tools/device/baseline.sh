@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Performance baseline for a TV Box machine: the "before" numbers every
+# Performance baseline for a Otto TV machine: the "before" numbers every
 # optimization gets compared against. Read-only apart from a 128 MB test
 # file it deletes; a reboot undoes the rest (dropped caches, opened apps).
 #
@@ -13,8 +13,8 @@
 # else open. It opens apps and moves around the home screen by itself.
 
 MODE=${1:-full}
-STATE=/data/misc/tvbox
-TMP=/data/local/tmp/tvbox-baseline.tmp
+STATE=/data/misc/otto
+TMP=/data/local/tmp/otto-baseline.tmp
 
 say() { echo "$*" >&3; }
 section() { echo; echo "===== $* ====="; }
@@ -22,7 +22,7 @@ now_cs() { awk '{ printf "%d", $1 * 100 }' /proc/uptime; }
 secs() { awk -v a="$1" -v b="$2" 'BEGIN { printf "%.1f", (b - a) / 100 }'; }
 
 version() {
-	v=$("$STATE/tvbox-remote" -version 2>/dev/null)
+	v=$("$STATE/otto-remote" -version 2>/dev/null)
 	echo "${v:-unknown}"
 }
 
@@ -38,8 +38,8 @@ label() {
 	echo "${l:--padrao}"
 }
 
-OUT=/data/local/tmp/tvbox-baseline-$(version)$(label).txt
-[ "$MODE" = video ] && OUT=/data/local/tmp/tvbox-video-$(version)$(label).txt
+OUT=/data/local/tmp/otto-baseline-$(version)$(label).txt
+[ "$MODE" = video ] && OUT=/data/local/tmp/otto-video-$(version)$(label).txt
 
 if [ "$(id -u)" != 0 ]; then
 	echo "Precisa de root: rode 'adb root', conecte de novo e repita."
@@ -79,7 +79,7 @@ say "Medindo (uns 4 minutos). Nao mexe na TV enquanto isso."
 
 section build
 getprop ro.build.fingerprint
-echo "tvbox $(version)"
+echo "otto $(version)"
 uname -a
 cat /proc/cmdline
 date '+%F %T %z'
@@ -89,11 +89,11 @@ cat /proc/uptime
 section boot-events
 logcat -b events -d 2>/dev/null | grep -E 'boot_progress|sf_stop_bootanim|wm_boot_animation_done'
 section boot-kernel
-dmesg | grep -E 'Run /init|tvbox:|sys\.boot_completed=1|post_bootcomplete' | head -n 80
+dmesg | grep -E 'Run /init|otto:|sys\.boot_completed=1|post_bootcomplete' | head -n 80
 section boot-props
 getprop | grep -E 'boottime|boot_completed'
-section boot-tvbox-log
-logcat -d -v monotonic -s tvbox 2>/dev/null | head -n 60
+section boot-otto-log
+logcat -d -v monotonic -s otto 2>/dev/null | head -n 60
 section boot-installs
 for p in $(pm list packages -3 | sed 's/^package://'); do
 	echo "$p: $(dumpsys package "$p" | grep -m 2 -E 'firstInstallTime|lastUpdateTime' | tr -s ' \n' ' ')"
@@ -233,7 +233,7 @@ component() {
 }
 section app-starts
 apps_summary=""
-for p in com.android.tv.settings app.tvbox.connect org.fdroid.fdroid com.aurora.store com.duckduckgo.mobile.android com.stremio.one; do
+for p in com.android.tv.settings app.ottotv.connect org.fdroid.fdroid com.aurora.store com.duckduckgo.mobile.android com.stremio.one; do
 	comp=$(component "$p") || continue
 	times=""
 	for _ in 1 2 3; do
@@ -256,7 +256,7 @@ sleep 3
 # This is what low RAM, zram and Android Go's limits change.
 section multitask
 mt=""
-for p in org.fdroid.fdroid com.aurora.store com.duckduckgo.mobile.android com.android.tv.settings app.tvbox.connect com.stremio.one me.zhanghai.android.files; do
+for p in org.fdroid.fdroid com.aurora.store com.duckduckgo.mobile.android com.android.tv.settings app.ottotv.connect com.stremio.one me.zhanghai.android.files; do
 	c=$(component "$p") && mt="$mt $c"
 done
 for c in $mt; do
@@ -328,9 +328,9 @@ temps=$(for z in /sys/class/thermal/thermal_zone*; do
 done | tr '\n' ' ')
 
 section summary
-SUMMARY=/data/local/tmp/tvbox-summary.tmp
+SUMMARY=/data/local/tmp/otto-summary.tmp
 {
-	echo "TV Box $(version) $(label | cut -c2-) | $(date '+%F %T')"
+	echo "Otto TV $(version) $(label | cut -c2-) | $(date '+%F %T')"
 	echo "Boot: tela inicial ${screen_ms:-?} ms apos o kernel, boot completo ${done_s:-?} s"
 	echo "RAM: total $(mem MemTotal) MB, disponivel $(mem MemAvailable) MB, swap $(mem SwapTotal) MB (livre $(mem SwapFree) MB)"
 	echo "Abrir apps a frio (mediana de 3):$apps_summary"

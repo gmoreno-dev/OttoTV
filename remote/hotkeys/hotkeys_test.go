@@ -138,7 +138,7 @@ func TestWatcherReadsKeyboardsOnly(t *testing.T) {
 		map[string][2]string{
 			"event4": {"AT Translated Set 2 keyboard", atKeyboard},
 			"event6": {"ETPS/2 Elantech Touchpad", touchpad},
-			"event9": {"TV Box Remote Keyboard", atKeyboard},
+			"event9": {"Otto Remote Keyboard", atKeyboard},
 		},
 		map[string][]byte{"event4": altF4, "event6": ctrlAltDel, "event9": ctrlAltDel})
 
@@ -147,7 +147,7 @@ func TestWatcherReadsKeyboardsOnly(t *testing.T) {
 	done := make(chan struct{}, 8)
 	w := &Watcher{
 		SysDir: sys, DevDir: dev,
-		Skip: func(name string) bool { return strings.HasPrefix(name, "TV Box Remote") },
+		Skip: func(name string) bool { return strings.HasPrefix(name, "Otto Remote") },
 		Handle: func(a Action) {
 			mu.Lock()
 			got = append(got, a)

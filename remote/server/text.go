@@ -3,7 +3,7 @@ package server
 import (
 	"unicode"
 
-	u "tvbox/remote/uinput"
+	u "otto/remote/uinput"
 )
 
 // Stroke is one key press with the modifiers held while it happens.

@@ -1,4 +1,4 @@
-package app.tvbox.connect;
+package app.ottotv.connect;
 
 import android.inputmethodservice.InputMethodService;
 import android.util.Log;
@@ -7,7 +7,7 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 
 /**
- * The keyboard TV Box selects when a physical keyboard is plugged in.
+ * The keyboard Otto TV selects when a physical keyboard is plugged in.
  *
  * It never draws anything, so keys reach the app as if there were no
  * on-screen keyboard. What it adds is Enter in text fields: it runs the
@@ -16,10 +16,10 @@ import android.view.inputmethod.InputConnection;
  * that. EnterAction has the rules, including the big Enter key arriving as
  * OK (DPAD_CENTER) on this system.
  *
- * Logs under the "TVBoxKeyboard" tag: adb logcat -s TVBoxKeyboard
+ * Logs under the "OttoKeyboard" tag: adb logcat -s OttoKeyboard
  */
 public class KeyboardService extends InputMethodService {
-    static final String TAG = "TVBoxKeyboard";
+    static final String TAG = "OttoKeyboard";
 
     @Override
     public boolean onEvaluateInputViewShown() {

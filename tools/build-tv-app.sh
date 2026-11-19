@@ -49,11 +49,11 @@ find "$WORK/classes" -name '*.class' >"$WORK/classlist"
 
 if [ ! -f "$KEYSTORE" ]; then
 	mkdir -p "$(dirname "$KEYSTORE")"
-	keytool -genkeypair -keystore "$KEYSTORE" -alias tvbox -keyalg RSA -keysize 2048 \
-		-validity 10000 -dname "CN=TV Box" -storepass tvboxapp -keypass tvboxapp >/dev/null 2>&1
+	keytool -genkeypair -keystore "$KEYSTORE" -alias otto -keyalg RSA -keysize 2048 \
+		-validity 10000 -dname "CN=Otto TV" -storepass ottoapp -keypass ottoapp >/dev/null 2>&1
 fi
 "$BT/zipalign" -f 4 "$WORK/app.apk" "$WORK/aligned.apk"
-"$BT/apksigner" sign --ks "$KEYSTORE" --ks-pass pass:tvboxapp --ks-key-alias tvbox \
+"$BT/apksigner" sign --ks "$KEYSTORE" --ks-pass pass:ottoapp --ks-key-alias otto \
 	--out "$OUT_APK" "$WORK/aligned.apk"
 rm -f "$OUT_APK.idsig"
 echo "built $OUT_APK ($VERSION, code $CODE)"
