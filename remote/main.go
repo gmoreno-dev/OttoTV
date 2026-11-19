@@ -29,6 +29,7 @@ import (
 	"otto/remote/server"
 	"otto/remote/system"
 	"otto/remote/uinput"
+	"otto/remote/update"
 	"otto/remote/web"
 )
 
@@ -36,6 +37,9 @@ import (
 var (
 	productName = "Otto TV"
 	version     = "dev"
+	// The GitHub repository ("owner/name") whose releases update the TV
+	// (config.env's UPDATE_REPO). Empty: no updates from the TV.
+	updateRepo = ""
 )
 
 // notify shows a notice on the TV, over any app (tvapp's ToastReceiver).
@@ -77,12 +81,17 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "prefetch" {
 		os.Exit(prefetch.Main(os.Args[2:]))
 	}
+	// The build machine signs releases with it (see update.SignMain).
+	if len(os.Args) > 1 && os.Args[1] == "sign-update" {
+		os.Exit(update.SignMain(os.Args[2:], os.Stdout, os.Stderr))
+	}
 	port := flag.Int("port", 8686, "HTTP port")
 	state := flag.String("state", "/data/misc/otto", "folder for the pairing token")
 	uinputPath := flag.String("uinput", "/dev/uinput", "uinput device")
 	name := flag.String("name", productName, "name shown on the phone")
 	useHotkeys := flag.Bool("hotkeys", true, "keyboard shortcuts: Alt+F4 closes the app, Ctrl+Alt+Del opens the power menu")
 	app := flag.String("app", "app.ottotv.connect", "Otto TV's app: the launcher, its quick panel and notices")
+	repo := flag.String("update-repo", updateRepo, "GitHub repository (owner/name) with the releases; empty: no updates")
 	localName := flag.String("mdns", "otto-tv", "the TV's name on the network (NAME.local); empty: none")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
@@ -141,6 +150,15 @@ func main() {
 	}
 	srv.System = sys
 	srv.Notify = func(kind, pkg string) { notify(*app, kind, pkg) }
+	if *repo != "" {
+		srv.Update = &update.Installer{
+			Key:     update.PublicKey,
+			Current: version,
+			Dir:     filepath.Join(*state, "update"),
+			Live:    update.LiveFromCmdline("/proc/cmdline"),
+		}
+		srv.UpdateRepo = *repo
+	}
 
 	httpSrv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", *port),

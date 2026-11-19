@@ -202,6 +202,7 @@ public class HomeActivity extends Activity implements AppMenu.Listener {
         pollStatus();
         render(true);
         loadApps();
+        Updates.check(this);
     }
 
     @Override

@@ -21,6 +21,8 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
+
+	"otto/remote/update"
 )
 
 // Server wires the pieces together. Keys and Pointer may be nil when the
@@ -48,6 +50,10 @@ type Server struct {
 	// LocalName is the TV's name on the network, "otto-tv.local", once the
 	// mdns package has claimed it, else "". May be nil.
 	LocalName func() string
+	// Update installs new versions; nil: none. UpdateRepo is the GitHub
+	// repository ("owner/name") whose releases the app looks at.
+	Update     *update.Installer
+	UpdateRepo string
 
 	phones  atomic.Int32
 	pairsAt atomic.Int64 // unix nanos of the last phone that connected

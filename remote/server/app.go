@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"rsc.io/qr"
+
+	"otto/remote/update"
 )
 
 // System is what the launcher's quick panel can change, which apps may not
@@ -37,6 +39,9 @@ func (s *Server) appRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /app/power", s.onlyFromApp(s.handleAppPower))
 	mux.HandleFunc("GET /app/details", s.onlyFromApp(s.handleAppDetails))
 	mux.HandleFunc("GET /app/pair", s.onlyFromApp(s.handleAppPair))
+	mux.HandleFunc("GET /app/update", s.onlyFromApp(s.handleAppUpdate))
+	mux.HandleFunc("POST /app/update/check", s.onlyFromApp(s.handleAppUpdateCheck))
+	mux.HandleFunc("POST /app/update/install", s.onlyFromApp(s.handleAppUpdateInstall))
 }
 
 // onlyFromApp lets in Otto TV's app (and root or the adb shell), asking
@@ -213,4 +218,85 @@ func QRRows(text string) ([]string, error) {
 		rows[y] = b.String()
 	}
 	return rows, nil
+}
+
+// --- Updates (the update package) -----------------------------------------------
+//
+// The app looks for a new release on GitHub and downloads it (tvapp,
+// home/Updates.java); these routes check what it found and install it.
+
+// handleAppUpdate says what the app needs to look: this build's version,
+// the GitHub repository with the releases, whether this system can be
+// updated (not a live one) and what was installed since boot.
+func (s *Server) handleAppUpdate(w http.ResponseWriter, r *http.Request) {
+	if s.Update == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"repo": ""})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"current":   s.Update.Current,
+		"repo":      s.UpdateRepo,
+		"live":      s.Update.IsLive(),
+		"installed": s.Update.Installed(),
+	})
+}
+
+// handleAppUpdateCheck takes a release's manifest and says whether it is
+// signed and newer.
+func (s *Server) handleAppUpdateCheck(w http.ResponseWriter, r *http.Request) {
+	if s.Update == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "unavailable"})
+		return
+	}
+	var m update.Manifest
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&m); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad request"})
+		return
+	}
+	newer, err := s.Update.Check(m)
+	if err != nil {
+		log.Printf("update %s: %v", m.Version, err)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": updateError(err)})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "newer": newer, "version": m.Version})
+}
+
+// handleAppUpdateInstall takes the manifest (Otto-Manifest header) and the
+// archive (the body, streamed while the app downloads it) and installs it.
+func (s *Server) handleAppUpdateInstall(w http.ResponseWriter, r *http.Request) {
+	if s.Update == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "unavailable"})
+		return
+	}
+	var m update.Manifest
+	if err := json.Unmarshal([]byte(r.Header.Get("Otto-Manifest")), &m); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad request"})
+		return
+	}
+	log.Printf("update: installing %s", m.Version)
+	if err := s.Update.Install(m, http.MaxBytesReader(w, r.Body, m.Size+1)); err != nil {
+		log.Printf("update %s: %v", m.Version, err)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": updateError(err)})
+		return
+	}
+	log.Printf("update: %s installed, used after a restart", m.Version)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "version": m.Version})
+}
+
+// updateError is the error's name for the app.
+func updateError(err error) string {
+	switch {
+	case errors.Is(err, update.ErrSignature):
+		return "signature"
+	case errors.Is(err, update.ErrNotNewer):
+		return "not_newer"
+	case errors.Is(err, update.ErrDownload):
+		return "download"
+	case errors.Is(err, update.ErrBusy):
+		return "busy"
+	case errors.Is(err, update.ErrLive):
+		return "live"
+	}
+	return "install"
 }

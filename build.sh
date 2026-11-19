@@ -11,7 +11,8 @@
 #   (Debian/Ubuntu/WSL: sudo apt install xorriso curl python3 golang
 #    openjdk-17-jdk-headless zip, then tools/setup-android-sdk.sh)
 # OTTO_PREBUILT=<dir> skips compiling: it takes otto-remote and
-# app.ottotv.connect.apk from that folder instead.
+# app.ottotv.connect.apk from that folder instead (tools/build-ours.sh
+# makes one).
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")" && pwd)
@@ -104,17 +105,16 @@ REMOTE_BIN="$STAGE/otto/remote/otto-remote"
 # every boot in live mode), and ours runs the pairing screen and the keyboard
 # from the moment the home screen shows. See otto_system_apps in 9-otto.
 CONNECT_APK="$STAGE/otto/system_app/OttoConnect/OttoConnect.apk"
-if [ -n "${OTTO_PREBUILT:-}" ]; then
-	cp "$OTTO_PREBUILT/otto-remote" "$REMOTE_BIN"
-	cp "$OTTO_PREBUILT/app.ottotv.connect.apk" "$CONNECT_APK"
-else
-	# Static binary: Android's libc is not glibc, so nothing may be linked in.
-	(cd "$ROOT/remote" && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
-		-ldflags "-s -w -X 'main.productName=$PRODUCT_NAME' -X main.version=$VERSION" \
-		-o "$REMOTE_BIN" .)
-	"$ROOT/tools/build-tv-app.sh" "$CONNECT_APK" "$VERSION" "$CACHE/otto.keystore"
-fi
+PREBUILT=${OTTO_PREBUILT:-$ROOT/build/ours}
+[ -n "${OTTO_PREBUILT:-}" ] || "$ROOT/tools/build-ours.sh" "$PREBUILT"
+cp "$PREBUILT/otto-remote" "$REMOTE_BIN"
+cp "$PREBUILT/app.ottotv.connect.apk" "$CONNECT_APK"
 chmod 755 "$REMOTE_BIN"
+[ "$("$REMOTE_BIN" -version)" = "$VERSION" ] ||
+	die "otto-remote in $PREBUILT is $("$REMOTE_BIN" -version), not $VERSION: build it again (tools/build-ours.sh)"
+# How the TV installs an update it downloaded itself (the update package):
+# each archive brings its own copy.
+cp "$ROOT/tools/device/update.sh" "$STAGE/otto/update.sh"
 
 # 5. Apps from F-Droid (cached between builds) --------------------------------
 # apps.lock records exactly which build of each app went into this ISO.
@@ -157,6 +157,17 @@ UPDATE_TAR="$OUT/$ISO_BASENAME-$VERSION-update.tar"
 tar -C "$STAGE" --format=ustar --owner=0 --group=0 --exclude=otto/user_app \
 	-cf "$UPDATE_TAR" scripts otto initrd.img
 log "Update archive: $UPDATE_TAR"
+# Its manifest, signed: what a release needs for TVs to update themselves
+# (README, Releases). Only with the signing key, which never leaves cache/.
+MANIFEST="$OUT/otto-tv-update.json"
+rm -f "$MANIFEST"
+if [ -f "$CACHE/otto-update.key" ]; then
+	"$REMOTE_BIN" sign-update -key "$CACHE/otto-update.key" -version "$VERSION" "$UPDATE_TAR" >"$MANIFEST.part"
+	mv "$MANIFEST.part" "$MANIFEST"
+	log "Signed manifest: $MANIFEST"
+else
+	echo "warning: no cache/otto-update.key: the update isn't signed, so TVs won't take it from a release" >&2
+fi
 if [ -n "${OTTO_UPDATE_ONLY:-}" ]; then
 	log "Done (OTTO_UPDATE_ONLY: no ISO)"
 	exit 0

@@ -3,6 +3,7 @@ package app.ottotv.connect.home;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.RectF;
 import android.text.Layout;
 import android.text.StaticLayout;
@@ -11,7 +12,7 @@ import android.view.View;
 
 /**
  * One item of the quick panel: sound output, laptop screen, Wi-Fi, phone,
- * power or "Show details". Each draws itself like the design's panel: a
+ * power, an update (only when there is one) or "Show details". Each draws itself like the design's panel: a
  * rounded tile, lighter when focused, grown 1.04 with the amber ring.
  */
 final class PanelItem extends View {
@@ -21,6 +22,7 @@ final class PanelItem extends View {
     static final int PHONE = 3;
     static final int POWER = 4;
     static final int DETAILS = 5;
+    static final int UPDATE = 6;
 
     private final Ui ui;
     final int kind;
@@ -30,6 +32,7 @@ final class PanelItem extends View {
     private final TextPaint state = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final RectF r = new RectF();
     private final RectF p = new RectF();
+    private final Path clip = new Path();
     private final Anim focus = new Anim(0, Ui.FAST);
     private final Anim grow = new Anim(0, Ui.MOVE);
     private final Anim knob = new Anim(1, Ui.MOVE);
@@ -46,6 +49,9 @@ final class PanelItem extends View {
     int bars = 3;
     boolean cable;
     String stateText = "";
+    /** UPDATE: its icon, and how far the download is (0 to 1; -1: no bar). */
+    String icon = Icons.DOWNLOAD;
+    float progress = -1;
     private StaticLayout subLayout;
 
     PanelItem(Context c, Ui ui, int kind) {
@@ -137,8 +143,8 @@ final class PanelItem extends View {
         int save = c.save();
         c.scale(s, s, w / 2, h / 2);
         r.set(0, 0, w, h);
-        boolean light = (kind == WIFI || kind == PHONE) && on;
-        float rad = kind == DETAILS ? h / 2 : ui.f(28);
+        boolean light = (kind == WIFI || kind == PHONE || kind == UPDATE) && on;
+        float rad = kind == DETAILS || kind == UPDATE ? h / 2 : ui.f(28);
         int bg = light ? (focused ? Ui.ON_FOCUS : Ui.ON) : (focused ? Ui.ITEM_FOCUS : Ui.ITEM);
         Draw.round(c, r, rad, bg);
         switch (kind) {
@@ -152,6 +158,9 @@ final class PanelItem extends View {
             case WIFI:
             case PHONE:
                 drawTile(c, w, h, light);
+                break;
+            case UPDATE:
+                drawUpdate(c, w, h, light);
                 break;
             default:
                 drawDetails(c, w, h);
@@ -313,6 +322,28 @@ final class PanelItem extends View {
         c.rotate(180 * chevron.get(), cx, h / 2);
         Icons.draw(c, Icons.CHEVRON_DOWN, cx - is / 2, h / 2 - is / 2, is, 2.4f, Ui.TEXT, false);
         c.restoreToCount(save);
+    }
+
+    /** An update: icon and what to do, centered; the download fills the pill from the left. */
+    private void drawUpdate(Canvas c, float w, float h, boolean light) {
+        if (progress >= 0) {
+            int save = c.save();
+            clip.rewind();
+            clip.addRoundRect(r, h / 2, h / 2, Path.Direction.CW);
+            c.clipPath(clip);
+            Paint fill = Draw.paint();
+            fill.setColor(Ui.alpha(0xFFFFFF, 0.14f));
+            c.drawRect(0, 0, w * Math.min(1, progress), h, fill);
+            c.restoreToCount(save);
+        }
+        int fg = light ? Ui.ON_TEXT : Ui.TEXT;
+        title.setColor(fg);
+        float is = ui.f(28), gap = ui.f(12);
+        String text = Draw.fit(titleText, title, w - is - gap - ui.f(48));
+        float tw = title.measureText(text);
+        float x = (w - (is + gap + tw)) / 2;
+        Icons.draw(c, icon, x, h / 2 - is / 2, is, 2.4f, fg, false);
+        c.drawText(text, x + is + gap, Draw.centerBaseline(title, h / 2), title);
     }
 
     private static int blend(int a, int b, float t) {

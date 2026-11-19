@@ -129,4 +129,21 @@
     <string name="safe_title">A tela inicial do Otto TV teve um problema</string>
     <string name="safe_note">Seus apps estão todos aqui. Tente abrir a tela inicial completa de novo, ou reinicie a TV.</string>
     <string name="safe_retry">Abrir a tela inicial completa</string>
+    <!-- Atualizações pela própria TV (home/Updates.java) -->
+    <string name="update_to">Atualizar para a versão %1$s</string>
+    <string name="update_downloading">Baixando a atualização… %1$d%%</string>
+    <string name="update_installing">Instalando a atualização…</string>
+    <string name="update_restart">Reiniciar para usar a versão %1$s</string>
+    <string name="update_retry">Tentar atualizar de novo</string>
+    <string name="update_found">Atualização disponível</string>
+    <string name="update_found_sub">Versão %1$s: abra o painel rápido (F2)</string>
+    <string name="update_ready">Atualização instalada</string>
+    <string name="update_ready_sub">Reinicie a TV para usar</string>
+    <string name="update_err_network">Não foi possível baixar a atualização</string>
+    <string name="update_err_download">O download veio com defeito</string>
+    <string name="update_err_signature">Esta atualização não é oficial e foi recusada</string>
+    <string name="update_err_live">Instale o Otto TV para receber atualizações</string>
+    <string name="update_err_not_newer">O Otto TV já está atualizado</string>
+    <string name="update_err_install">Não foi possível instalar a atualização</string>
+    <string name="update_err_sub">Confira a internet e tente de novo</string>
 </resources>

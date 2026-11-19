@@ -43,6 +43,8 @@ final class Icons {
     static final String BOX = "M3.5 7.5L12 3l8.5 4.5v9L12 21l-8.5-4.5z M3.5 7.5L12 12l8.5-4.5 M12 12v9";
     static final String QR = "M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M14 14h2 M18 14h2v2 M14 18v2h2 M18 18h2v2h-2";
     static final String CHEVRON_DOWN = "M6 9l6 6 6-6";
+    static final String DOWNLOAD = "M12 4v11 M7 10.5l5 5 5-5 M5 20h14";
+    static final String RESTART = "M20 12a8 8 0 1 1-2.34-5.66 M20 4v5h-5";
     static final String CHEVRON_LEFT = "M15 6l-6 6 6 6";
     static final String CHEVRON_RIGHT = "M9 6l6 6-6 6";
     static final String KEYBOARD = "M4 6.5h16a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z"

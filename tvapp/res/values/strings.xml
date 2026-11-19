@@ -129,4 +129,21 @@
     <string name="safe_title">Otto TV\'s home screen ran into a problem</string>
     <string name="safe_note">Your apps are all here. Try the full home screen again, or restart the TV.</string>
     <string name="safe_retry">Open the full home screen</string>
+    <!-- Updates from the TV itself (home/Updates.java) -->
+    <string name="update_to">Update to version %1$s</string>
+    <string name="update_downloading">Downloading the update… %1$d%%</string>
+    <string name="update_installing">Installing the update…</string>
+    <string name="update_restart">Restart to use version %1$s</string>
+    <string name="update_retry">Try the update again</string>
+    <string name="update_found">Update available</string>
+    <string name="update_found_sub">Version %1$s: open the quick panel (F2)</string>
+    <string name="update_ready">Update installed</string>
+    <string name="update_ready_sub">Restart the TV to use it</string>
+    <string name="update_err_network">Couldn\'t download the update</string>
+    <string name="update_err_download">The download came out damaged</string>
+    <string name="update_err_signature">This update isn\'t an official one, so it was refused</string>
+    <string name="update_err_live">Install Otto TV to get updates</string>
+    <string name="update_err_not_newer">Otto TV is up to date</string>
+    <string name="update_err_install">Couldn\'t install the update</string>
+    <string name="update_err_sub">Check the internet and try again</string>
 </resources>

@@ -4,7 +4,7 @@ Turn an old PC or laptop into a fast, plug-and-play Android TV for any TV.
 Flash a USB stick, plug the computer into the TV over HDMI, try it live, then
 install it.
 
-> Status: **v0.6.2, early development.** Tested on one machine so far:
+> Status: **v0.7.0, early development.** Tested on one machine so far:
 > [Acer HM77 / Ivy Bridge](docs/hardware/acer-hm77-ivybridge.md).
 
 **What it needs:** a 64-bit PC with SSE4.2 (Android 14 requires it: Intel
@@ -124,6 +124,9 @@ moving to a new upstream release is mostly bumping the ISO hash.
   F1 lists the keyboard and mouse shortcuts, with the phone remote's QR
   code. Small notices confirm what happened ("Celular conectado", the app
   that Alt+F4 closed, the laptop screen going dark).
+- **Updates from the TV itself.** New releases show up in the quick panel;
+  one click downloads, checks and installs them, then a restart.
+  Signed, so only official releases install (see Releases below).
 - **Phone remote, no app to install.** Scan the QR code on the TV and the
   phone's browser becomes a remote: directional pad, OK, back, home, volume,
   play/pause, a touchpad and a keyboard that types on the TV (accents
@@ -239,6 +242,44 @@ The images (boot menu, boot animation, installer, app icons) are committed.
 regenerate them from `art/brand/otto-geo.js` (the design's Otto, drawn in
 JavaScript) and `art/fonts` (Inter, SIL OFL). The SVG files in `art/brand`
 are rebuilt from `otto-geo.js` too: change the geometry there, not in them.
+
+## Releases and updates from the TV
+
+Installed TVs update themselves from this repository's GitHub releases.
+Every few hours the TV app asks GitHub for the latest release and hands
+its manifest to `otto-remote`, which checks the signature; when the release
+is newer, the quick panel offers it ("Update to version X"). Choosing it
+streams the update archive from GitHub into `otto-remote`, which checks it
+against the manifest, installs it with the archive's own `update.sh` (the
+same one used over ADB) and asks for a restart. Live systems (the USB
+stick) don't update.
+
+```
+ TV app (tvapp/, home/Updates.java)          otto-remote (remote/update, root)
+  api.github.com: latest release ─────────▶  /app/update/check: signed? newer?
+  otto-tv-update.json (the manifest)
+  otto-tv-X-update.tar, streamed ──────────▶  /app/update/install: size and
+                                              SHA-256 as signed, then update.sh
+```
+
+The manifest names the archive with its size and SHA-256, signed with
+Ed25519. The public key is built into `otto-remote` (`remote/update/key.go`);
+the private one is `cache/otto-update.key`, on the build machine only, so
+nobody else (GitHub included) can get a TV to install something.
+
+**To publish a release:**
+
+1. Set `VERSION` in `config.env` (higher than the last release) and build.
+   With `cache/otto-update.key` present, the build signs the update:
+   `out/otto-tv-<version>-update.tar` and `out/otto-tv-update.json`.
+2. On GitHub, draft a new release with the tag `v<version>`, attach both
+   files and publish it. TVs pick it up within a few hours (or when the
+   quick panel opens).
+
+`UPDATE_REPO` in `config.env` names the repository; empty turns updates off.
+Keep backups of `cache/otto-update.key` and of the app's signing key
+(`cache/otto.keystore` and `.pass`): without the first, TVs can't be
+updated from releases; without the second, the app can't be updated.
 
 ## Boot options
 

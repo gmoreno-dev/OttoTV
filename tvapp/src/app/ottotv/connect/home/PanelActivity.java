@@ -36,8 +36,9 @@ import app.ottotv.connect.R;
  * The quick panel (F2, over any app; Alt+F4 on the home screen and
  * Ctrl+Alt+Del open it on Power): where the sound goes and the laptop's own
  * screen (on laptops), Wi-Fi, connecting a phone, suspend, restart and turn
- * off, and the system's details. It never scrolls: 824 px tall on a laptop,
- * 540 on a desktop.
+ * off, a new version when there is one (Updates), and the system's
+ * details. It never scrolls: 824 px tall on a laptop, 540 on a desktop, 80
+ * more with an update.
  *
  * otto-remote does what an app may not (switch the sound, the laptop
  * screen, restart): see Remote.
@@ -71,6 +72,7 @@ public class PanelActivity extends Activity {
     private PanelItem wifi;
     private PanelItem phone;
     private PanelItem power;
+    private PanelItem update;
     private PanelItem more;
 
     private Remote.Status status = Remote.last;
@@ -126,6 +128,9 @@ public class PanelActivity extends Activity {
         net.start();
         tickClock();
         Remote.get(STATUS, this::onStatus);
+        Updates.listener = this::onUpdates;
+        Updates.check(this);
+        onUpdates();
     }
 
     @Override
@@ -134,6 +139,7 @@ public class PanelActivity extends Activity {
         if (shown == this) {
             shown = null;
         }
+        Updates.listener = null;
         net.stop();
         handler.removeCallbacksAndMessages(null);
     }
@@ -162,7 +168,7 @@ public class PanelActivity extends Activity {
         this.laptop = laptop;
         stage.removeAllViews();
         items.clear();
-        float h = panelHeight(laptop);
+        float h = panelHeight(laptop) + (Updates.state != Updates.NONE ? PanelItem.height(PanelItem.UPDATE) + 16 : 0);
 
         box = new Box(this, ui);
         box.setClipChildren(false);
@@ -196,6 +202,11 @@ public class PanelActivity extends Activity {
         y += PanelItem.height(PanelItem.WIFI) + 16;
         power = item(PanelItem.POWER, 32, y, inner);
         y += PanelItem.height(PanelItem.POWER) + 16;
+        update = null;
+        if (Updates.state != Updates.NONE) {
+            update = item(PanelItem.UPDATE, 32, y, inner);
+            y += PanelItem.height(PanelItem.UPDATE) + 16;
+        }
         more = item(PanelItem.DETAILS, 32, y, inner);
 
         details = new DetailsCard(this, ui);
@@ -207,7 +218,8 @@ public class PanelActivity extends Activity {
         place(stage, toast, 250, 130, ToastView.WIDTH, -2);
 
         refresh(false);
-        PanelItem first = "power".equals(startOn) ? power : laptop ? sound : wifi;
+        PanelItem first = "power".equals(startOn) ? power
+                : "update".equals(startOn) && update != null ? update : laptop ? sound : wifi;
         focus = -1;
         focus(first);
         // withLayer: the panel is drawn once and slid as an image, not redrawn per frame.
@@ -293,9 +305,88 @@ public class PanelActivity extends Activity {
         power.options = new String[] {getString(R.string.panel_suspend), getString(R.string.panel_restart),
                 getString(R.string.panel_turn_off)};
         power.update(animate);
+        if (update != null) {
+            fillUpdate();
+            update.update(animate);
+        }
         more.titleText = getString(detailsShown ? R.string.panel_hide_details : R.string.panel_show_details);
         more.on = detailsShown;
         more.update(animate);
+    }
+
+    private void fillUpdate() {
+        String v = Updates.version;
+        update.progress = -1;
+        update.on = false;
+        update.icon = Icons.DOWNLOAD;
+        switch (Updates.state) {
+            case Updates.AVAILABLE:
+                update.on = true;
+                update.titleText = getString(R.string.update_to, v);
+                break;
+            case Updates.DOWNLOADING:
+                update.progress = Updates.progress / 100f;
+                update.titleText = getString(R.string.update_downloading, Updates.progress);
+                break;
+            case Updates.INSTALLING:
+                update.progress = 1;
+                update.titleText = getString(R.string.update_installing);
+                break;
+            case Updates.DONE:
+                update.on = true;
+                update.icon = Icons.RESTART;
+                update.titleText = getString(R.string.update_restart, v);
+                break;
+            default:
+                update.titleText = getString(R.string.update_retry);
+        }
+    }
+
+    /** Updates changed: a pill shows up (or goes), or says what is going on. */
+    private void onUpdates() {
+        if (isDestroyed()) {
+            return;
+        }
+        if ((Updates.state != Updates.NONE) != (update != null)) {
+            int kind = focus >= 0 ? items.get(focus).kind : -1;
+            build(laptop, kind == PanelItem.POWER ? "power" : kind == PanelItem.UPDATE ? "update" : null);
+            box.setAlpha(1);
+            box.setTranslationX(0);
+            box.animate().cancel();
+            return;
+        }
+        refresh(true);
+        int before = seen;
+        seen = Updates.state;
+        if (Updates.state == Updates.FAILED && !Updates.error.isEmpty()) {
+            String e = Updates.error;
+            boolean again = !e.equals("signature") && !e.equals("live") && !e.equals("not_newer");
+            showToast(Icons.DOWNLOAD, getString(updateError(e)), again ? getString(R.string.update_err_sub) : null);
+            Updates.error = "";
+        } else if (Updates.state == Updates.DONE && before == Updates.INSTALLING) {
+            showToast(Icons.RESTART, getString(R.string.update_ready), getString(R.string.update_ready_sub));
+        }
+    }
+
+    /** The update state this panel last showed. */
+    private int seen = -1;
+
+    private static int updateError(String e) {
+        switch (e) {
+            case "download":
+                return R.string.update_err_download;
+            case "signature":
+                return R.string.update_err_signature;
+            case "live":
+                return R.string.update_err_live;
+            case "not_newer":
+                return R.string.update_err_not_newer;
+            case "install":
+            case "busy":
+                return R.string.update_err_install;
+            default:
+                return R.string.update_err_network;
+        }
     }
 
     private void onStatus(JSONObject j) {
@@ -362,6 +453,9 @@ public class PanelActivity extends Activity {
         pair.add(phone);
         rows.add(pair);
         rows.add(one(power));
+        if (update != null) {
+            rows.add(one(update));
+        }
         rows.add(one(more));
         return rows;
     }
@@ -485,6 +579,13 @@ public class PanelActivity extends Activity {
                 break;
             case PanelItem.POWER:
                 powerAction(it.selected);
+                break;
+            case PanelItem.UPDATE:
+                if (Updates.state == Updates.DONE) {
+                    powerAction(1); // restart
+                } else {
+                    Updates.install();
+                }
                 break;
             default:
                 showDetails(!detailsShown);
