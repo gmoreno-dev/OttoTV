@@ -70,7 +70,9 @@ func Run(o Options) error {
 	lg.Printf("no prefetch this boot (%s): recording in %s", why, o.Wait)
 	os.Remove(o.List)
 	o.Sleep(o.Wait)
-	rec, err := Record(o.Paths, 512<<10, 20000)
+	// 128 KB: on the Acer, merging parts up to 512 KB apart made the list
+	// 1.6 GB, more than 30 seconds of reading.
+	rec, err := Record(o.Paths, 128<<10, 20000, start)
 	if err != nil {
 		return err
 	}

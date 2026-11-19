@@ -978,6 +978,9 @@ prefetch() {
 	wait
 }
 prefetch
+expect "prefetch: recording boot, read-ahead left alone" "128" "$(cat "$TMP/sysfs/block/sda/queue/read_ahead_kb")"
+echo "otto-prefetch 1 1" >"$pf/otto/prefetch.list"
+prefetch
 expect "prefetch: started with the system image and /data, read-ahead up for the boot" \
 	"prefetch -list /mnt/../$pf/otto/prefetch.list $pf/system_a.img /mnt/../$pf/data.img /mnt/../$pf/data/dalvik-cache /mnt/../$pf/data/misc/apexdata /mnt/../$pf/data/app /mnt/../$pf/data/system /mnt/../$pf/data/system_de /mnt/../$pf/data/user_de|2048|2048" \
 	"$(cat "$TMP/pftmp/prefetch-args" 2>/dev/null)|$(cat "$TMP/sysfs/block/sda/queue/read_ahead_kb")|$(cat "$TMP/sysfs/block/loop0/queue/read_ahead_kb")"

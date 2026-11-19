@@ -126,7 +126,7 @@ func TestRunRecordsThenPrefetches(t *testing.T) {
 	os.WriteFile(filepath.Join(data, "system", "packages.xml"), []byte("<packages/>"), 0o644)
 	// What the boot read is in memory: here, all of it (just written).
 	list := filepath.Join(dir, "prefetch.list")
-	now := time.Unix(1795100000, 0)
+	now := time.Now().Add(time.Hour)
 	var slept time.Duration
 	var logs bytes.Buffer
 	o := Options{List: list, Paths: []string{img, data, filepath.Join(dir, "missing")}, Wait: 90 * time.Second,
@@ -172,7 +172,7 @@ func TestRecordOrdersByDiskPlace(t *testing.T) {
 	for _, n := range []string{"b", "a", "c"} {
 		os.WriteFile(filepath.Join(dir, n), bytes.Repeat([]byte(n), 64<<10), 0o644)
 	}
-	files, err := Record([]string{dir}, 0, 10)
+	files, err := Record([]string{dir}, 0, 10, time.Now().Add(time.Hour))
 	if err != nil || len(files) != 3 {
 		t.Fatalf("got %d files, %v", len(files), err)
 	}
@@ -185,5 +185,19 @@ func TestRecordOrdersByDiskPlace(t *testing.T) {
 	defer f.Close()
 	if physical(f, 0) == 0 {
 		t.Log("no FIEMAP here: order falls back to the walk's")
+	}
+}
+
+func TestRecordSkipsFilesWrittenThisBoot(t *testing.T) {
+	dir := t.TempDir()
+	old := filepath.Join(dir, "boot.oat")
+	fresh := filepath.Join(dir, "base.odex")
+	os.WriteFile(old, make([]byte, 8192), 0o644)
+	os.WriteFile(fresh, make([]byte, 8192), 0o644)
+	boot := time.Now().Add(-time.Minute)
+	os.Chtimes(old, boot.Add(-time.Hour), boot.Add(-time.Hour))
+	files, err := Record([]string{dir}, 0, 10, boot)
+	if err != nil || len(files) != 1 || files[0].Path != old {
+		t.Fatalf("got %+v, %v", files, err)
 	}
 }

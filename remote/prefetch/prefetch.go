@@ -223,10 +223,13 @@ func Same(f File) bool {
 }
 
 // Record lists what of each file is in memory now. Directories are walked
-// for regular files, up to maxFiles of them; missing paths are skipped.
+// for regular files, up to maxFiles of them; missing paths are skipped, and
+// so are files changed since `since` (the boot's start): written during
+// this boot, like apps compiling in the background, they are not what a
+// boot reads.
 // The files come in the order they sit on the disk, so reading the list
 // sweeps the disk once instead of seeking back and forth.
-func Record(paths []string, gap int64, maxFiles int) ([]File, error) {
+func Record(paths []string, gap int64, maxFiles int, since time.Time) ([]File, error) {
 	var names []string
 	for _, p := range paths {
 		st, err := os.Stat(p)
@@ -257,7 +260,7 @@ func Record(paths []string, gap int64, maxFiles int) ([]File, error) {
 			continue
 		}
 		st, err := f.Stat()
-		if err != nil || st.Size() == 0 {
+		if err != nil || st.Size() == 0 || !st.ModTime().Before(since) {
 			f.Close()
 			continue
 		}

@@ -406,7 +406,8 @@ otto_boot_animation() {
 # for it, then exits; with no list yet it waits for the boot to finish and
 # notes what it read (remote/prefetch). It keeps running after
 # switch_root: from the initrd's root it still sees the partition at /mnt.
-# Disk read-ahead goes up for the boot too (init-hooks.sh puts it back).
+# With a list, disk read-ahead goes up for the boot too (init-hooks.sh puts
+# it back).
 # Only installed systems (the list is kept next to our files); live ones
 # boot from a stick. OTTO_PREFETCH=off turns it off.
 otto_prefetch() {
@@ -418,9 +419,13 @@ otto_prefetch() {
 	otto_first_boot && return 0
 	img=$(cat "$sys/block/loop0/loop/backing_file" 2>/dev/null)
 	[ -f "$img" ] || return 0
-	for q in "$sys"/block/sd*/queue "$sys/block/loop0/queue"; do
-		[ -w "$q/read_ahead_kb" ] && echo 2048 >"$q/read_ahead_kb"
-	done
+	# Only with a list: a boot that records one should read what it needs,
+	# not what a large read-ahead drags along.
+	if [ -f "$dir/otto/prefetch.list" ]; then
+		for q in "$sys"/block/sd*/queue "$sys/block/loop0/queue"; do
+			[ -w "$q/read_ahead_kb" ] && echo 2048 >"$q/read_ahead_kb"
+		done
+	fi
 	# A copy in RAM: the partition may be mounted noexec.
 	cp "$dir/otto/remote/otto-remote" "$bin" && chmod 755 "$bin" || return 0
 	(
