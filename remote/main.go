@@ -110,6 +110,7 @@ func main() {
 
 	srv := &server.Server{
 		Name:    *name,
+		Version: version,
 		Port:    *port,
 		Pairing: pairing,
 		LANIP:   server.LANIP,

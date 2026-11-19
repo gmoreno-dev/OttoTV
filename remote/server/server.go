@@ -29,6 +29,7 @@ import (
 // virtual devices could not be created: phones still connect and get told.
 type Server struct {
 	Name    string
+	Version string // this build's, for the quick panel's details
 	Port    int
 	Pairing *Pairing
 	Keys    Keys

@@ -173,7 +173,7 @@ func (s *Server) handleAppPower(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAppDetails(w http.ResponseWriter, r *http.Request) {
-	d := map[string]any{"ip": s.LANIP()}
+	d := map[string]any{"ip": s.LANIP(), "version": s.Version}
 	if s.System != nil {
 		for k, v := range s.System.Details() {
 			d[k] = v
@@ -259,6 +259,7 @@ func (s *Server) handleAppUpdateCheck(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": updateError(err)})
 		return
 	}
+	log.Printf("update: latest release %s, this is %s (newer: %v)", m.Version, s.Update.Current, newer)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "newer": newer, "version": m.Version})
 }
 

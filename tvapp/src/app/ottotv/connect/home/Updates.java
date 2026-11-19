@@ -110,14 +110,18 @@ final class Updates {
             JSONArray assets = release.optJSONArray("assets");
             String manifestURL = asset(assets, MANIFEST);
             if (manifestURL == null) {
+                Log.i(TAG, "latest release has no " + MANIFEST);
                 return;
             }
             JSONObject m = fetchJSON(manifestURL);
             JSONObject answer = Remote.request("POST", "/app/update/check", m, 5000);
             String url = asset(assets, m.optString("file"));
             if (answer == null || !answer.optBoolean("newer") || url == null) {
+                Log.i(TAG, "latest release " + m.optString("version") + ": "
+                        + (answer == null ? "refused by otto-remote" : url == null ? "no archive" : "not newer"));
                 return;
             }
+            Log.i(TAG, "update available: " + m.optString("version"));
             MAIN.post(() -> {
                 if (state == NONE || state == AVAILABLE) {
                     manifest = m;

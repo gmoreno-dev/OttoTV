@@ -701,6 +701,8 @@ public class PanelActivity extends Activity {
                 : R.string.panel_graphics_hardware);
         int adb = j == null ? 0 : j.optInt("adb");
         String adbText = j == null ? unknown : adb > 0 ? getString(R.string.panel_adb_on, adb) : getString(R.string.panel_adb_off);
+        String version = j == null ? "" : j.optString("version");
+        details.setCorner(version.isEmpty() ? "" : "Otto TV " + version);
         details.set(getString(R.string.panel_details), new String[] {
             getString(R.string.panel_cpu_temp), getString(R.string.panel_cpu_use), getString(R.string.panel_ram),
             getString(R.string.panel_uptime), getString(R.string.panel_ip), getString(R.string.panel_graphics),

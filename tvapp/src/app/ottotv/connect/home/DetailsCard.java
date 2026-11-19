@@ -11,6 +11,7 @@ import android.view.View;
  * "System details", opened next to the quick panel: CPU temperature and
  * use, free memory, time since it was turned on, the TV's address, the
  * graphics mode and network debugging. Two columns, the last one full width.
+ * Otto TV's version sits across from the title.
  */
 final class DetailsCard extends View {
     static final float WIDTH = 640;
@@ -22,6 +23,7 @@ final class DetailsCard extends View {
     private final TextPaint value = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final RectF r = new RectF();
     private String title = "";
+    private String corner = "";
     private String[] labels = new String[0];
     private String[] values = new String[0];
 
@@ -35,6 +37,12 @@ final class DetailsCard extends View {
         ui.type(value, 28, 700);
         value.setLetterSpacing(-0.01f);
         value.setColor(Ui.TEXT);
+    }
+
+    /** Across from the title: "Otto TV 0.7.0". */
+    void setCorner(String text) {
+        corner = text == null ? "" : text;
+        invalidate();
     }
 
     void set(String title, String[] labels, String[] values) {
@@ -62,6 +70,10 @@ final class DetailsCard extends View {
 
         float x = ui.f(32), y = ui.f(28);
         c.drawText(title, x, Draw.centerBaseline(head, y + ui.f(17)), head);
+        if (!corner.isEmpty()) {
+            float cw = label.measureText(corner);
+            c.drawText(corner, w - x - cw, Draw.centerBaseline(label, y + ui.f(17)), label);
+        }
         y += ui.f(34 + 12);
         float gap = ui.f(12);
         float cw = (w - 2 * x - gap) / 2, ch = ui.f(88);
