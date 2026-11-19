@@ -7,30 +7,37 @@ const TEXTS = {
   en: {
     pairTitle: 'Pair with the TV',
     pairHint: 'On the TV, open Connect phone and type the 6-digit code shown there.',
-    pinLabel: 'Code',
+    pinLabel: '6-digit code',
     pairButton: 'Pair',
+    pairing: 'Pairing…',
     wrongPin: 'That code doesn’t match. Check the TV and try again.',
     pairClosed: 'Open Connect phone on the TV, then type the code.',
     pairFailed: 'Can’t reach the TV. Check that the phone is on the same Wi-Fi.',
     reconnecting: 'Reconnecting…',
-    noInput: 'The TV can’t receive keys right now',
+    noInput: 'The TV can’t receive commands right now',
     demo: 'Preview',
     padHint: 'Drag to move. Tap to click.\nTwo fingers to scroll, tap with two to go back.',
     typeHint: 'What you type shows up on the TV.',
+    typeLabel: 'Text for the TV',
     erase: 'Erase', space: 'Space', enter: 'Enter',
+    modes: 'Remote modes',
+    linkOn: 'Status: connected', linkOff: 'Status: reconnecting', linkDown: 'Status: not receiving commands',
     tabButtons: 'Remote', tabTouchpad: 'Touchpad', tabKeyboard: 'Keyboard',
     skipped: 'Some characters can’t be typed on the TV and were skipped.',
     power: 'Sleep', dpad: 'Directional pad', up: 'Up', down: 'Down', left: 'Left', right: 'Right',
     back: 'Back', home: 'Home', menu: 'Menu', volume: 'Volume',
     voldown: 'Volume down', volup: 'Volume up', mute: 'Mute', play: 'Play or pause',
-    laptopOff: 'Turn the laptop screen off', laptopOn: 'Turn the laptop screen on',
+    laptopOff: 'Laptop screen on. Tap to turn it off.', laptopOn: 'Laptop screen off. Tap to turn it on.',
     laptopIsOff: 'Laptop screen off', laptopIsOn: 'Laptop screen on',
+    screenOn: 'Screen on', screenOff: 'Screen off',
+    sleeping: 'Putting the TV to sleep…',
   },
   pt: {
     pairTitle: 'Parear com a TV',
     pairHint: 'Na TV, abra Conectar celular e digite o código de 6 dígitos que aparece lá.',
-    pinLabel: 'Código',
+    pinLabel: 'Código de 6 dígitos',
     pairButton: 'Parear',
+    pairing: 'Pareando…',
     wrongPin: 'Esse código não confere. Confira na TV e tente de novo.',
     pairClosed: 'Abra Conectar celular na TV e digite o código.',
     pairFailed: 'Não deu para falar com a TV. Confira se o celular está no mesmo Wi-Fi.',
@@ -39,14 +46,19 @@ const TEXTS = {
     demo: 'Prévia',
     padHint: 'Arraste para mover. Toque para clicar.\nDois dedos para rolar, toque com dois para voltar.',
     typeHint: 'O que você digitar aparece na TV.',
+    typeLabel: 'Texto para a TV',
     erase: 'Apagar', space: 'Espaço', enter: 'Enter',
+    modes: 'Modos do controle',
+    linkOn: 'Status: conectado', linkOff: 'Status: reconectando', linkDown: 'Status: sem receber comandos',
     tabButtons: 'Controle', tabTouchpad: 'Touchpad', tabKeyboard: 'Teclado',
     skipped: 'Alguns caracteres não dá para digitar na TV e foram pulados.',
     power: 'Suspender', dpad: 'Direcional', up: 'Cima', down: 'Baixo', left: 'Esquerda', right: 'Direita',
     back: 'Voltar', home: 'Início', menu: 'Menu', volume: 'Volume',
     voldown: 'Diminuir volume', volup: 'Aumentar volume', mute: 'Silenciar', play: 'Reproduzir ou pausar',
-    laptopOff: 'Apagar a tela do notebook', laptopOn: 'Acender a tela do notebook',
+    laptopOff: 'Tela do notebook acesa. Toque para apagar.', laptopOn: 'Tela do notebook apagada. Toque para acender.',
     laptopIsOff: 'Tela do notebook apagada', laptopIsOn: 'Tela do notebook acesa',
+    screenOn: 'Tela acesa', screenOff: 'Tela apagada',
+    sleeping: 'Suspendendo a TV…',
   },
 };
 const LANG = (navigator.language || 'en').toLowerCase().startsWith('pt') ? 'pt' : 'en';
@@ -98,19 +110,37 @@ let ready = false;
 let retries = 0;
 let retryTimer = null;
 
+// on: connected; off: reconnecting; noinput: connected, but the TV has no
+// virtual keyboard or mouse (commands go nowhere); demo: the preview.
 function setStatus(state) {
   const dot = $('#status-dot');
-  dot.classList.toggle('on', state === 'on');
-  dot.classList.toggle('off', state === 'off' || state === 'noinput');
+  dot.classList.toggle('warn', state === 'off');
+  dot.classList.toggle('down', state === 'noinput');
   $('#status-text').textContent =
-    { off: t('reconnecting'), noinput: t('noInput'), demo: t('demo') }[state] || '';
+    { off: t('linkOff'), noinput: t('linkDown') }[state] || t('linkOn');
+  $('#reconnecting').hidden = state !== 'off';
+  $('#down').hidden = state !== 'noinput';
+  $('#body').classList.toggle('dim', state === 'noinput');
+  if (state === 'demo') toast(t('demo'));
+}
+
+// --- Toast ------------------------------------------------------------------------
+
+let toastTimer = null;
+
+function toast(text) {
+  $('#toast-text').textContent = text;
+  $('#toast').classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $('#toast').classList.remove('on'), 2500);
 }
 
 // --- Laptop screen -------------------------------------------------------------------
 
 // The TV says "on" or "off" when it runs on a laptop, "" otherwise.
 let laptop = '';
-let noteTimer = null;
+
+const SCREEN = 'M4 5h16v11H4z M2 19.5h20';
 
 function setLaptop(state, announce) {
   laptop = state || '';
@@ -120,14 +150,9 @@ function setLaptop(state, announce) {
   const off = laptop === 'off';
   b.setAttribute('aria-pressed', String(off));
   b.setAttribute('aria-label', t(off ? 'laptopOn' : 'laptopOff'));
-  if (announce) {
-    const note = $('#status-text');
-    note.textContent = t(off ? 'laptopIsOff' : 'laptopIsOn');
-    clearTimeout(noteTimer);
-    noteTimer = setTimeout(() => {
-      if (note.textContent === t(off ? 'laptopIsOff' : 'laptopIsOn')) note.textContent = '';
-    }, 2500);
-  }
+  $('#laptop-text').textContent = t(off ? 'screenOff' : 'screenOn');
+  $('#laptop-icon').setAttribute('d', off ? SCREEN + ' M3 3l18 18' : SCREEN);
+  if (announce) toast(t(off ? 'laptopIsOff' : 'laptopIsOn'));
 }
 
 function connect() {
@@ -154,7 +179,7 @@ function connect() {
     } else if (m.type === 'error' && m.error === 'no_input') {
       setStatus('noinput');
     } else if (m.type === 'typed' && m.skipped > 0) {
-      $('#type-note').textContent = t('skipped');
+      $('#type-note').hidden = false;
     }
   };
   ws.onclose = () => {
@@ -188,7 +213,7 @@ function showDemo(msg) {
     scroll: () => t('tabTouchpad'),
   }[msg.type];
   if (!what || msg.action === 'up') return;
-  $('#status-text').textContent = `${t('demo')}: ${what()}`;
+  toast(`${t('demo')}: ${what()}`);
 }
 
 setInterval(() => send({ type: 'ping' }), 20000);
@@ -239,6 +264,7 @@ function bindKey(el) {
       send({ type: 'key', key, action: 'up' });
     } else if (e.type === 'pointerup') {
       send({ type: 'key', key });
+      if (key === 'power') toast(t('sleeping'));
     }
   };
   el.addEventListener('pointerup', end);
@@ -254,6 +280,13 @@ function bindKey(el) {
 
 function bindTouchpad(pad) {
   const pointers = new Map();
+  const dot = $('#touch');
+  // Where the finger is, as in the design: a ring under it.
+  const showTouch = (e) => {
+    const r = pad.getBoundingClientRect();
+    dot.style.left = `${e.clientX - r.left}px`;
+    dot.style.top = `${e.clientY - r.top}px`;
+  };
   let start = 0;
   let travel = 0;
   let maxFingers = 0;
@@ -280,6 +313,7 @@ function bindTouchpad(pad) {
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     maxFingers = Math.max(maxFingers, pointers.size);
     pad.classList.add('active');
+    showTouch(e);
   });
 
   pad.addEventListener('pointermove', (e) => {
@@ -289,6 +323,7 @@ function bindTouchpad(pad) {
     const dy = e.clientY - p.y;
     p.x = e.clientX;
     p.y = e.clientY;
+    showTouch(e);
     travel += Math.abs(dx) + Math.abs(dy);
     if (pointers.size === 1) {
       // Faster swipes travel further, like a laptop touchpad.
@@ -329,8 +364,11 @@ function bindTouchpad(pad) {
 const SENTINEL = '​';
 
 function bindTyping(input) {
-  const reset = () => { input.value = SENTINEL; };
+  const hint = $('#typing-hint');
+  const showHint = () => { hint.hidden = input.value.replace(SENTINEL, '') !== ''; };
+  const reset = () => { input.value = SENTINEL; showHint(); };
   reset();
+  input.addEventListener('input', showHint);
   input.addEventListener('focus', () => {
     if (!input.value.startsWith(SENTINEL)) input.value = SENTINEL + input.value;
   });
@@ -372,6 +410,35 @@ function showPair() {
   $('#remote').hidden = true;
   $('#pair').hidden = false;
   $('#pin').value = '';
+  showCode();
+}
+
+// The code in six boxes, three and three, as the TV shows it.
+function showCode() {
+  const pin = $('#pin');
+  const code = pin.value.replace(/\D/g, '').slice(0, 6);
+  if (pin.value !== code) pin.value = code;
+  const focused = document.activeElement === pin;
+  $$('.box').forEach((box, i) => {
+    box.textContent = code[i] || '';
+    box.classList.toggle('filled', i < code.length);
+    box.classList.toggle('active', focused && i === code.length && !pairing);
+  });
+  $('#pair-btn').setAttribute('aria-disabled', String(code.length !== 6 && !pairing));
+}
+
+const ERROR_ICONS = {
+  code: 'M12 8v5 M12 16.5h.01 M10.3 3.9L2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z',
+  net: 'M2.5 9a14 14 0 0 1 19 0 M5.5 12.5a9.5 9.5 0 0 1 13 0 M8.8 16a5 5 0 0 1 6.4 0 M12 19.5h.01 M4 3.5l16 17',
+};
+
+// kind: code (the boxes turn red) or net; no text clears it.
+function pairError(kind, text) {
+  $('#pair-error').hidden = !text;
+  $('#boxes').classList.toggle('bad', !!text && kind === 'code');
+  if (!text) return;
+  $('#pair-error-icon').setAttribute('d', ERROR_ICONS[kind]);
+  $('#pair-error-text').textContent = text;
 }
 
 function showRemote() {
@@ -397,10 +464,15 @@ function setMode(mode) {
   if (mode === 'keyboard') $('#typing').focus();
 }
 
+let pairing = false;
+
 async function pair(pin) {
-  const error = $('#pair-error');
-  error.textContent = '';
+  if (pairing || pin.length !== 6) return;
+  pairError('', '');
   if (DEMO) { showRemote(); return; }
+  pairing = true;
+  $('#pair-btn').textContent = t('pairing');
+  showCode();
   try {
     const res = await fetch('/api/pair', {
       method: 'POST',
@@ -412,10 +484,14 @@ async function pair(pin) {
       saveToken(body.token);
       showRemote();
     } else {
-      error.textContent = body.error === 'wrong_pin' ? t('wrongPin') : t('pairClosed');
+      pairError('code', body.error === 'wrong_pin' ? t('wrongPin') : t('pairClosed'));
     }
   } catch {
-    error.textContent = t('pairFailed');
+    pairError('net', t('pairFailed'));
+  } finally {
+    pairing = false;
+    $('#pair-btn').textContent = t('pairButton');
+    showCode();
   }
 }
 
@@ -433,9 +509,16 @@ function init() {
   $$('.tabs [role="tab"]').forEach((tab) => {
     tab.addEventListener('click', () => setMode(tab.dataset.mode));
   });
+  const pin = $('#pin');
+  pin.addEventListener('input', () => { pairError('', ''); showCode(); });
+  pin.addEventListener('focus', showCode);
+  pin.addEventListener('blur', showCode);
+  const pairBtn = $('#pair-btn');
+  pairBtn.addEventListener('pointerdown', () => pairBtn.classList.add('pressed'));
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) => pairBtn.addEventListener(ev, () => pairBtn.classList.remove('pressed')));
   $('#pair-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    pair($('#pin').value.trim());
+    pair(pin.value.trim());
   });
   if (token || DEMO) showRemote();
   else showPair();
