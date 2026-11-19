@@ -5,18 +5,10 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.res.ColorStateList;
-import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.util.TypedValue;
-import android.view.Gravity;
-import android.widget.ImageView;
-import android.widget.LinearLayout;
-import android.widget.ProgressBar;
-import android.widget.TextView;
 
 /**
  * "Almost ready": what a first boot shows between the end of the boot
@@ -40,28 +32,7 @@ public class PreparingActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setGravity(Gravity.CENTER);
-        box.setBackgroundColor(0xFF161B22);
-
-        ImageView otto = new ImageView(this);
-        otto.setImageResource(R.drawable.preparing);
-        box.addView(otto, new LinearLayout.LayoutParams(dp(200), dp(200)));
-
-        TextView title = text(R.string.preparing_title, 34, 0xFFF4F6F9);
-        title.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
-        box.addView(title, wrap(dp(12)));
-        box.addView(text(R.string.preparing_text, 18, 0xFFA9B3C1), wrap(dp(8)));
-
-        ProgressBar bar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-        bar.setIndeterminate(true);
-        bar.setIndeterminateTintList(ColorStateList.valueOf(0xFFF2B25C));
-        LinearLayout.LayoutParams barSize = new LinearLayout.LayoutParams(dp(320), LinearLayout.LayoutParams.WRAP_CONTENT);
-        barSize.topMargin = dp(28);
-        box.addView(bar, barSize);
-
-        setContentView(box);
+        setContentView(Waiting.view(this, R.drawable.preparing, R.string.preparing_title, R.string.preparing_text));
         handler.postDelayed(new ConnectActivity.Close(this), GIVE_UP_MS);
         IntentFilter filter = new IntentFilter(READY);
         if (Build.VERSION.SDK_INT >= 33) {
@@ -75,7 +46,12 @@ public class PreparingActivity extends Activity {
     protected void onStop() {
         super.onStop();
         // Covered by the first-run screen (or anything else): its job is done.
-        finish();
+        // Not when Android recreates it for a configuration change: on the
+        // first boot of 0.4.4 that came 2 seconds in (new overlays after the
+        // user unlocked), and closed it right there.
+        if (!isChangingConfigurations()) {
+            finish();
+        }
     }
 
     @Override
@@ -83,26 +59,6 @@ public class PreparingActivity extends Activity {
         handler.removeCallbacksAndMessages(null);
         unregisterReceiver(ready);
         super.onDestroy();
-    }
-
-    private TextView text(int res, int sp, int color) {
-        TextView t = new TextView(this);
-        t.setText(res);
-        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
-        t.setTextColor(color);
-        t.setGravity(Gravity.CENTER);
-        return t;
-    }
-
-    private LinearLayout.LayoutParams wrap(int top) {
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        p.topMargin = top;
-        return p;
-    }
-
-    private int dp(int v) {
-        return Math.round(v * getResources().getDisplayMetrics().density);
     }
 
     static final class Ready extends BroadcastReceiver {

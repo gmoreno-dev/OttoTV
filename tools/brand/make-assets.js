@@ -11,7 +11,7 @@
 //   iso/otto/bootanimation{,-first}.zip       Android boot animation
 //   iso/otto/installer/branding/otto/*.png    installer images
 //   iso/otto/installer/wallpaper.png          installer desktop
-//   tvapp/res/drawable*/{icon,banner,preparing}.png  "Connect phone" app
+//   tvapp/res/drawable*/{icon,banner,preparing,loading}.png  "Connect phone" app
 //   remote/web/static/icon-*.png              phone remote (home screen icon)
 const fs = require('fs');
 const os = require('os');
@@ -196,6 +196,9 @@ async function connectApp(browser) {
   // screens up to xhdpi.
   await render(browser, '<svg viewBox="28 22 150 150" width="400" height="400">' + G.pose('wave') + '</svg>',
     path.join(ROOT, 'tvapp/res/drawable-nodpi/preparing.png'));
+  // "Loading..." ("Connect phone" while its page starts): Otto thinking.
+  await render(browser, '<svg viewBox="20 16 160 160" width="400" height="400">' + G.pose('think') + '</svg>',
+    path.join(ROOT, 'tvapp/res/drawable-nodpi/loading.png'));
   await render(browser, banner('Connect', 'phone'), path.join(ROOT, 'tvapp/res/drawable-nodpi/banner.png'), { opaque: true });
 }
 

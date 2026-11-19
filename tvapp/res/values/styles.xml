@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Otto's night blue behind everything, from the first frame: the
+         window used to be black until the page drew. -->
+    <color name="night">#161B22</color>
+    <style name="Otto" parent="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">@color/night</item>
+        <item name="android:colorBackground">@color/night</item>
+    </style>
+</resources>
