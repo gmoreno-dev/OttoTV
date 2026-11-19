@@ -9,9 +9,41 @@ import android.view.KeyEvent;
  * its widgets move the focus. Our screens move the focus themselves, so
  * they ask for them here. They follow the system's setting (Settings,
  * sound effects), like everywhere else.
+ *
+ * Android loads these sounds once, at boot. On one boot of 0.6.2 they never
+ * played until a restart: most likely the loading failed because the sound
+ * server restarted right then (init-hooks.sh restarts it at boot complete
+ * when the TV shows up late on HDMI). So the screens ask Android to load
+ * them again now and then (reload): when they are loaded already, that
+ * costs nothing.
  */
 final class Sfx {
+    private static final long EVERY_MS = 30_000;
+    private static long reloadedAt = -EVERY_MS;
+    private static final java.util.concurrent.ExecutorService BG =
+            java.util.concurrent.Executors.newSingleThreadExecutor();
+
     private Sfx() {
+    }
+
+    /** Makes sure Android has the sounds loaded (off the main thread: it waits for the loading). */
+    static void reload(Context c) {
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (now - reloadedAt < EVERY_MS) {
+            return;
+        }
+        reloadedAt = now;
+        AudioManager am = c.getSystemService(AudioManager.class);
+        if (am == null) {
+            return;
+        }
+        BG.execute(() -> {
+            try {
+                am.loadSoundEffects();
+            } catch (RuntimeException e) {
+                android.util.Log.i("OttoSfx", "loading the sound effects: " + e);
+            }
+        });
     }
 
     /** The focus moved, with an arrow key. */

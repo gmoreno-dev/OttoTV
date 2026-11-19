@@ -135,6 +135,9 @@
     <string name="update_installing">Instalando a atualização…</string>
     <string name="update_restart">Reiniciar para usar a versão %1$s</string>
     <string name="update_retry">Tentar atualizar de novo</string>
+    <string name="update_chip">Atualização disponível</string>
+    <string name="update_chip_busy">Atualizando…</string>
+    <string name="update_chip_done">Reinicie para atualizar</string>
     <string name="update_found">Atualização disponível</string>
     <string name="update_found_sub">Versão %1$s: abra o painel rápido (F2)</string>
     <string name="update_ready">Atualização instalada</string>

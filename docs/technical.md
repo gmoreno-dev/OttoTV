@@ -121,7 +121,8 @@ installs what the signature vouches for. Live systems (the USB stick) don't
 update.
 
 The TV looks right after boot and then every 6 hours (if the network isn't
-up yet, it tries again a minute later).
+up yet, it tries again a minute later). When it finds one, the home screen
+shows "Update available" at the top until it's installed.
 
 **Publishing a release:**
 
@@ -295,7 +296,9 @@ to `/data/misc/otto/remote.log`.
   Turning the panel itself off crashed the Acer's GPU driver at boot. A
   "TV only" mode is still to be tried.
 - **Navigation sounds** went missing once on the Acer and came back after a
-  restart. Still looking into it.
+  restart. Most likely Android failed to load them at boot while the sound
+  server restarted; since 0.7.2 the home screen asks Android to load them
+  again, so they should come back on their own. Not confirmed yet.
 - **Wi-Fi and keyboard layout** are set in Android's settings for now.
 - **App downloads** come over HTTPS from f-droid.org; checking them against
   F-Droid's signed index is on the list.

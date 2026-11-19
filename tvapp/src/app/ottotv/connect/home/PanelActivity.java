@@ -128,8 +128,9 @@ public class PanelActivity extends Activity {
         net.start();
         tickClock();
         Remote.get(STATUS, this::onStatus);
-        Updates.listener = this::onUpdates;
+        Updates.listen(updates);
         Updates.check(this);
+        Sfx.reload(this);
         onUpdates();
     }
 
@@ -139,7 +140,7 @@ public class PanelActivity extends Activity {
         if (shown == this) {
             shown = null;
         }
-        Updates.listener = null;
+        Updates.unlisten(updates);
         net.stop();
         handler.removeCallbacksAndMessages(null);
     }
@@ -370,6 +371,7 @@ public class PanelActivity extends Activity {
 
     /** The update state this panel last showed. */
     private int seen = -1;
+    private final Updates.Listener updates = this::onUpdates;
 
     private static int updateError(String e) {
         switch (e) {

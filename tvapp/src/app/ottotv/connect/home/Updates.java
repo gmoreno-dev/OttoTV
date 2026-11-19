@@ -61,7 +61,8 @@ final class Updates {
     static int progress;
     /** Why it FAILED: network, download, signature, live, not_newer, busy or install. */
     static String error = "";
-    static Listener listener;
+    /** The quick panel and the home screen, while they show (main thread). */
+    private static final java.util.List<Listener> LISTENERS = new java.util.ArrayList<>();
 
     private static JSONObject manifest;
     private static String archiveURL;
@@ -245,9 +246,20 @@ final class Updates {
         changed();
     }
 
-    private static void changed() {
-        if (listener != null) {
-            listener.onUpdates();
+    static void listen(Listener l) {
+        if (!LISTENERS.contains(l)) {
+            LISTENERS.add(l);
+        }
+    }
+
+    static void unlisten(Listener l) {
+        LISTENERS.remove(l);
+    }
+
+    /** Tells the screens; tests call it after setting the state. */
+    static void changed() {
+        for (Listener l : new java.util.ArrayList<>(LISTENERS)) {
+            l.onUpdates();
         }
     }
 
@@ -259,7 +271,7 @@ final class Updates {
         }
         p.edit().putString("told", version).apply();
         HomeActivity.shown.showToast(Icons.DOWNLOAD, app.getString(R.string.update_found),
-                app.getString(R.string.update_found_sub, version));
+                app.getString(R.string.update_found_sub, version), 9000);
     }
 
     // ---- HTTP -----------------------------------------------------------------------

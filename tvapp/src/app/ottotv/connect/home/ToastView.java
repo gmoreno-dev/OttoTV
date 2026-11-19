@@ -41,6 +41,11 @@ final class ToastView extends View {
     }
 
     void show(String icon, String title, String sub) {
+        show(icon, title, sub, SHOWN_MS);
+    }
+
+    /** For longer: news worth reading in full (an update). */
+    void show(String icon, String title, String sub, long ms) {
         this.icon = icon;
         this.titleText = title;
         this.subText = sub == null ? "" : sub;
@@ -48,7 +53,7 @@ final class ToastView extends View {
         requestLayout();
         setShown(true);
         removeCallbacks(hide);
-        postDelayed(hide, SHOWN_MS);
+        postDelayed(hide, ms);
         announceForAccessibility(getContentDescription());
     }
 

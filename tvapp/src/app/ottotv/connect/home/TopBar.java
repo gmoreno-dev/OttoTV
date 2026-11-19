@@ -24,6 +24,7 @@ final class TopBar extends FrameLayout {
     final TextView clock;
     final PillButton wifiButton;
     private final View offline;
+    private final UpdateChip update;
 
     TopBar(Context c, Ui ui) {
         super(c);
@@ -48,6 +49,11 @@ final class TopBar extends FrameLayout {
         LinearLayout right = new LinearLayout(c);
         right.setOrientation(LinearLayout.HORIZONTAL);
         right.setGravity(Gravity.CENTER_VERTICAL);
+        update = new UpdateChip(c, ui);
+        update.setVisibility(GONE);
+        LinearLayout.LayoutParams up = new LinearLayout.LayoutParams(-2, ui.px(52));
+        up.rightMargin = ui.px(16);
+        right.addView(update, up);
         status = new StatusPill(c, ui);
         status.labels(c.getString(R.string.home_phone), c.getString(R.string.home_cable));
         right.addView(status, new LinearLayout.LayoutParams(-2, ui.px(52)));
@@ -88,6 +94,61 @@ final class TopBar extends FrameLayout {
 
     boolean offlineShown() {
         return offline.getVisibility() == VISIBLE;
+    }
+
+    /** "Update available" and its icon; "" hides it. */
+    void setUpdate(String text, String icon) {
+        update.set(text, icon);
+        update.setVisibility(text.isEmpty() ? GONE : VISIBLE);
+    }
+
+    /** An update waiting (Updates): an icon in amber and a few words, in dark glass. */
+    static final class UpdateChip extends View {
+        private final Ui ui;
+        private final android.text.TextPaint text = new android.text.TextPaint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF box = new RectF();
+        private String label = "";
+        private String icon = Icons.DOWNLOAD;
+
+        UpdateChip(Context c, Ui ui) {
+            super(c);
+            this.ui = ui;
+            ui.type(text, 24, 600);
+            text.setColor(Ui.TEXT);
+        }
+
+        void set(String label, String icon) {
+            if (label.equals(this.label) && icon.equals(this.icon)) {
+                return;
+            }
+            this.label = label;
+            this.icon = icon;
+            setContentDescription(label);
+            requestLayout();
+            invalidate();
+        }
+
+        @Override
+        protected void onMeasure(int w, int h) {
+            float width = ui.f(18) + ui.f(26) + ui.f(10) + text.measureText(label) + ui.f(22);
+            setMeasuredDimension(Math.round(width), ui.px(52));
+        }
+
+        @Override
+        protected void onDraw(Canvas c) {
+            float h = getHeight();
+            box.set(0, 0, getWidth(), h);
+            Draw.round(c, box, h / 2, Ui.alpha(0x0A0D12, 0.55f));
+            Paint p = Draw.paint();
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Math.max(1, ui.f(1)));
+            p.setColor(Ui.alpha(0xFFFFFF, 0.1f));
+            box.inset(p.getStrokeWidth() / 2, p.getStrokeWidth() / 2);
+            c.drawRoundRect(box, box.height() / 2, box.height() / 2, p);
+            float is = ui.f(26);
+            Icons.draw(c, icon, ui.f(18), h / 2 - is / 2, is, 2.4f, Ui.ACCENT, false);
+            c.drawText(label, ui.f(18) + is + ui.f(10), Draw.centerBaseline(text, h / 2), text);
+        }
     }
 
     /** The notice's rounded box: dark glass with a hairline border. */

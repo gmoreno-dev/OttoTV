@@ -202,7 +202,9 @@ public class HomeActivity extends Activity implements AppMenu.Listener {
         pollStatus();
         render(true);
         loadApps();
+        Updates.listen(updates);
         Updates.check(this);
+        Sfx.reload(this);
     }
 
     @Override
@@ -215,6 +217,7 @@ public class HomeActivity extends Activity implements AppMenu.Listener {
         if (shown == this) {
             shown = null;
         }
+        Updates.unlisten(updates);
         net.stop();
         handler.removeCallbacks(clockTick);
         handler.removeCallbacks(statusTick);
@@ -623,6 +626,10 @@ public class HomeActivity extends Activity implements AppMenu.Listener {
         more.setVisibility(isMore ? View.VISIBLE : View.GONE);
 
         top.showOffline(isHome && !net.online());
+        // Until it's installed, not just a notice that's gone in seconds.
+        // Offline, the "No internet" notice needs the room.
+        top.setUpdate(net.online() ? updateText() : "",
+                Updates.state == Updates.DONE ? Icons.RESTART : Icons.DOWNLOAD);
         top.wifiButton.setFocus(isHome && zone == BANNER && free, animate);
         top.status.set(net.kind(), net.bars(), audioLabel(), status.phones > 0, animate);
 
@@ -1393,6 +1400,30 @@ public class HomeActivity extends Activity implements AppMenu.Listener {
 
     void showToast(String icon, String title, String sub) {
         toast.show(icon, title, sub);
+    }
+
+    void showToast(String icon, String title, String sub, long ms) {
+        toast.show(icon, title, sub, ms);
+    }
+
+    // ---- Updates -----------------------------------------------------------------
+
+    private final Updates.Listener updates = () -> render(true);
+
+    /** What the top bar says about an update, "" for nothing. */
+    private String updateText() {
+        switch (Updates.state) {
+            case Updates.AVAILABLE:
+            case Updates.FAILED:
+                return getString(R.string.update_chip);
+            case Updates.DOWNLOADING:
+            case Updates.INSTALLING:
+                return getString(R.string.update_chip_busy);
+            case Updates.DONE:
+                return getString(R.string.update_chip_done);
+            default:
+                return "";
+        }
     }
 
     // ---- Clock and status --------------------------------------------------------------

@@ -135,6 +135,9 @@
     <string name="update_installing">Installing the update…</string>
     <string name="update_restart">Restart to use version %1$s</string>
     <string name="update_retry">Try the update again</string>
+    <string name="update_chip">Update available</string>
+    <string name="update_chip_busy">Updating…</string>
+    <string name="update_chip_done">Restart to update</string>
     <string name="update_found">Update available</string>
     <string name="update_found_sub">Version %1$s: open the quick panel (F2)</string>
     <string name="update_ready">Update installed</string>
