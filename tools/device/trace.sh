@@ -148,7 +148,7 @@ boot_done() {
 	done
 	dmesg >"$OUT/otto-boot-dmesg.txt" 2>&1
 	logcat -b events -d >"$OUT/otto-boot-events.txt" 2>&1
-	logcat -b main -b system -d -v uptime >"$OUT/otto-boot-logcat.txt" 2>&1
+	logcat -b main -b system -d -v monotonic >"$OUT/otto-boot-logcat.txt" 2>&1
 	getprop >"$OUT/otto-boot-props.txt" 2>&1
 	set --
 	[ -s "$trace" ] && set -- "$trace"
