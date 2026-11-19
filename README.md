@@ -251,7 +251,9 @@ ADB, without reinstalling: the build writes `out/otto-<version>-update.tar`
 with just our files. `tools/device/baseline.sh` measures a box (boot time, RAM, app start times,
 home screen smoothness, CPU, storage and Wi-Fi), so every optimization is
 compared against numbers from the same machine; `baseline.sh video` measures
-what playback costs while a video plays.
+what playback costs while a video plays. `tools/device/trace.sh` records a
+Perfetto trace of the home screen in use (`home`) or of a whole boot
+(`boot`, then `boot-done`), for ui.perfetto.dev or trace_processor.
 
 Debugging on a device goes through ADB over the network: enable developer
 options, rooted debugging and network debugging, then
