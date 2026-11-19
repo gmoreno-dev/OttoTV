@@ -394,6 +394,13 @@ func TestParseRejectsGarbage(t *testing.T) {
 
 // The real socket, on loopback: a legacy query gets a unicast answer.
 func TestSocket(t *testing.T) {
+	// Another responder on this machine (avahi...) would get some of the
+	// queries: only test when the port is free.
+	if free, err := net.ListenUDP("udp4", &net.UDPAddr{Port: 5353}); err != nil {
+		t.Skipf("port 5353 is in use here: %v", err)
+	} else {
+		free.Close()
+	}
 	c, err := Listen()
 	if err != nil {
 		t.Skipf("port 5353: %v", err)
