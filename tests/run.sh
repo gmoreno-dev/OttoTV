@@ -15,6 +15,9 @@ expect() { # <name> <expected> <actual>
 	if [ "$2" = "$3" ]; then pass "$1"; else fail "$1" "expected '$2', got '$3'"; fi
 }
 
+# otto-remote's folder (the sound's choice lives there): never this machine's.
+export OTTO_STATE="$TMP/otto-state"
+mkdir -p "$OTTO_STATE"
 # shellcheck source=iso/otto/init-hooks.sh
 source "$ROOT/iso/otto/init-hooks.sh"
 export OTTO_KMSG=/dev/null # keep test logs out of this machine's kernel log
@@ -91,8 +94,23 @@ first_caption="$(printf '%65s%s' '' 'Preparando o Otto TV pela primeira vez.')|$
 : >"$TMP/props"
 OTTO_ASOUND_CARDS="$TMP/cards" post_init
 expect "post_init: routes audio, sets the language and mirrors to the TV unasked" \
-	"setprop persist.sys.locale pt-BR|setprop persist.sys.display.enable_on_connect.external true|setprop hal.audio.primary.hdmi 1|setprop hal.audio.out.hdmi pcmC1D3p" \
+	"setprop persist.sys.locale pt-BR|setprop persist.sys.display.enable_on_connect.external true|setprop otto.audio.hdmi pcmC1D3p|setprop hal.audio.primary.hdmi 1|setprop hal.audio.out.hdmi pcmC1D3p" \
 	"$(paste -sd'|' "$TMP/props")"
+
+# The quick panel sent the sound to the laptop: it stays there, and the
+# TV's output is still known for the panel to switch back to.
+echo notebook >"$OTTO_STATE/audio"
+: >"$TMP/props"
+OTTO_ASOUND_CARDS="$TMP/cards" otto_setup_audio
+expect "audio: sound kept on the laptop when the panel chose it" \
+	"1|setprop otto.audio.hdmi pcmC1D3p" "$?|$(paste -sd'|' "$TMP/props")"
+echo tv >"$OTTO_STATE/audio"
+: >"$TMP/props"
+OTTO_ASOUND_CARDS="$TMP/cards" otto_setup_audio
+expect "audio: back on the TV when the panel chose it" \
+	"0|setprop otto.audio.hdmi pcmC1D3p|setprop hal.audio.primary.hdmi 1|setprop hal.audio.out.hdmi pcmC1D3p" \
+	"$?|$(paste -sd'|' "$TMP/props")"
+rm -f "$OTTO_STATE/audio"
 
 : >"$TMP/props"
 OTTO_AUDIO=off OTTO_ASOUND_CARDS="$TMP/cards" post_init
@@ -307,6 +325,7 @@ unset -f settings log
 	otto_setup_ime() { echo ime >>"$TMP/calls"; }
 	otto_start_remote() { echo remote >>"$TMP/calls"; [ -z "${REMOTE_FAILS:-}" ]; }
 	otto_wait_for_apps() { echo wait >>"$TMP/calls"; }
+	otto_setup_home() { echo home >>"$TMP/calls"; }
 	otto_offer_pairing() { echo pairing >>"$TMP/calls"; }
 	setprop() { echo "$1=$2" >>"$TMP/calls"; }
 	getprop() { echo pcmC0D3p; }
@@ -315,16 +334,74 @@ unset -f settings log
 : >"$TMP/calls"
 (otto_bootcomplete_early && post_bootcomplete)
 expect "bootcomplete: early call does the work, post_bootcomplete doesn't repeat it" \
-	"mirror|setup|remote|wait|ime|pairing|otto.boot.ready=1" "$(paste -sd'|' "$TMP/calls")"
+	"mirror|setup|remote|wait|home|ime|pairing|otto.boot.ready=1" "$(paste -sd'|' "$TMP/calls")"
 : >"$TMP/calls"
 (post_bootcomplete)
 expect "bootcomplete: post_bootcomplete steps in without the early call" \
-	"mirror|setup|remote|wait|ime|pairing|otto.boot.ready=1" "$(paste -sd'|' "$TMP/calls")"
+	"mirror|setup|remote|wait|home|ime|pairing|otto.boot.ready=1" "$(paste -sd'|' "$TMP/calls")"
 : >"$TMP/calls"
 (REMOTE_FAILS=1 otto_bootcomplete_early)
 expect "bootcomplete: no pairing screen when the remote didn't start" \
-	"mirror|setup|remote|wait|ime|otto.boot.ready=1" "$(paste -sd'|' "$TMP/calls")"
-unset -f otto_setup_mirror otto_setup_ime otto_start_remote otto_wait_for_apps otto_offer_pairing setprop getprop log
+	"mirror|setup|remote|wait|home|ime|otto.boot.ready=1" "$(paste -sd'|' "$TMP/calls")"
+
+# The TV woke up late: boot complete routes the sound and restarts
+# audioserver, unless the quick panel chose the laptop.
+# shellcheck disable=SC2329  # mocks, called by post_bootcomplete
+{
+	alsa_amixer() {
+		[ "$2" = 1 ] && printf "%s\n" "numid=9,iface=CARD,name='HDMI/DP,pcm=3 Jack'" \
+			"  ; type=BOOLEAN,access=r-------,values=1" "  : values=on"
+	}
+	getprop() { :; }
+	setprop() { echo "$1=$2" >>"$TMP/calls"; }
+	pkill() { echo "pkill $1" >>"$TMP/calls"; }
+}
+: >"$TMP/calls"
+(OTTO_EARLY_DONE=1 OTTO_ASOUND_CARDS="$TMP/cards" post_bootcomplete)
+expect "bootcomplete: a TV found late gets the sound" \
+	"otto.audio.hdmi=pcmC1D3p|hal.audio.primary.hdmi=1|hal.audio.out.hdmi=pcmC1D3p|pkill audioserver" \
+	"$(paste -sd'|' "$TMP/calls")"
+echo notebook >"$OTTO_STATE/audio"
+: >"$TMP/calls"
+(OTTO_EARLY_DONE=1 OTTO_ASOUND_CARDS="$TMP/cards" post_bootcomplete)
+expect "bootcomplete: ...but not when the sound was sent to the laptop" \
+	"otto.audio.hdmi=pcmC1D3p" "$(paste -sd'|' "$TMP/calls")"
+rm -f "$OTTO_STATE/audio"
+unset -f otto_setup_mirror otto_setup_ime otto_start_remote otto_wait_for_apps otto_setup_home otto_offer_pairing setprop getprop pkill log alsa_amixer
+# shellcheck source=iso/otto/init-hooks.sh
+source "$ROOT/iso/otto/init-hooks.sh"
+
+# Home screen: ours, with its two permissions, unless a launcher the user
+# installed was picked.
+# shellcheck disable=SC2329  # mocks, called by otto_setup_home
+{
+	appops() { echo "appops $*" >>"$TMP/calls"; }
+	cmd() {
+		case "$2" in
+		resolve-activity) printf 'priority=0 preferredOrder=0 match=0x108000\n%s\n' "$HOME_NOW" ;;
+		*) echo "cmd $*" >>"$TMP/calls" ;;
+		esac
+	}
+	pm() { echo "package:com.spocky.projengmenu"; echo "package:com.stremio.one"; }
+	log() { :; }
+}
+perms="appops set app.ottotv.connect GET_USAGE_STATS allow|appops set app.ottotv.connect SYSTEM_ALERT_WINDOW allow"
+sethome="cmd package set-home-activity app.ottotv.connect/.home.HomeActivity"
+for now in org.lineageos.tv.launcher/.MainActivity android/com.android.internal.app.ResolverActivity com.android.tv.settings/.FallbackHome ""; do
+	: >"$TMP/calls"
+	HOME_NOW="$now" otto_setup_home
+	expect "home: ours over '${now:-nothing}'" "$perms|$sethome" "$(paste -sd'|' "$TMP/calls")"
+done
+: >"$TMP/calls"
+HOME_NOW=app.ottotv.connect/.home.HomeActivity otto_setup_home
+expect "home: already ours, only the permissions" "$perms" "$(paste -sd'|' "$TMP/calls")"
+: >"$TMP/calls"
+HOME_NOW=com.spocky.projengmenu/.ui.home.MainActivity otto_setup_home
+expect "home: a launcher the user installed stays" "$perms" "$(paste -sd'|' "$TMP/calls")"
+: >"$TMP/calls"
+OTTO_LAUNCHER=upstream HOME_NOW=org.lineageos.tv.launcher/.MainActivity otto_setup_home
+expect "home: OTTO_LAUNCHER=upstream leaves the home screen alone" "$perms" "$(paste -sd'|' "$TMP/calls")"
+unset -f appops cmd pm log
 # shellcheck source=iso/otto/init-hooks.sh
 source "$ROOT/iso/otto/init-hooks.sh"
 
@@ -742,6 +819,22 @@ SRC=../$TMP/media OTTO_ANDROID="$TMP/android" otto_system_apps >/dev/null
 expect "apps: our app is layered over /system/app" \
 	"mount -t overlay -o lowerdir=/mnt/../$TMP/media/otto/system_app:$TMP/android/system/app overlay $TMP/android/system/app" \
 	"$(cat "$TMP/calls")"
+# Upstream's home screen in the same folder: hidden in the same overlay.
+mkdir -p "$TMP/android/system/app/TvLauncher" "$TMP/android/system/app/Calculator"
+# shellcheck disable=SC2329  # mock, called by otto_system_apps
+mknod() { echo "mknod $1 $2" >>"$TMP/calls"; }
+: >"$TMP/calls"
+SRC=../$TMP/media OTTO_ANDROID="$TMP/android" OTTO_TMP="$TMP" otto_system_apps >/dev/null
+expect "apps: upstream's home screen in /system/app hidden by the same overlay" \
+	"mknod $TMP/otto-system_app-whiteouts/TvLauncher c|mount -t overlay -o lowerdir=$TMP/otto-system_app-whiteouts:/mnt/../$TMP/media/otto/system_app:$TMP/android/system/app overlay $TMP/android/system/app" \
+	"$(paste -sd'|' "$TMP/calls")"
+unset -f mknod
+: >"$TMP/calls"
+SRC=../$TMP/media OTTO_ANDROID="$TMP/android" OTTO_TMP="$TMP" OTTO_LAUNCHER=upstream otto_system_apps >/dev/null
+expect "apps: OTTO_LAUNCHER=upstream keeps it" \
+	"mount -t overlay -o lowerdir=/mnt/../$TMP/media/otto/system_app:$TMP/android/system/app overlay $TMP/android/system/app" \
+	"$(cat "$TMP/calls")"
+rm -rf "$TMP/android/system/app/TvLauncher" "$TMP/android/system/app/Calculator"
 unset -f mount
 
 
@@ -811,6 +904,19 @@ expect "upstream apps: wizards and updater hidden, other system apps kept" \
 : >"$TMP/calls"
 OTTO_SETUP=wizard OTTO_ANDROID="$TMP/android" otto_hide_upstream_apps >/dev/null
 expect "upstream apps: OTTO_SETUP=wizard keeps the wizard, not the updater" \
+	"mknod Updater|mount $TMP/android/system/system_ext/priv-app" "$(paste -sd'|' "$TMP/calls")"
+# The home screen, whatever its folder is called, in priv-app or app.
+mkdir -p "$TMP/android/system/system_ext/priv-app/TvLauncher" \
+	"$TMP/android/system/product/app/Launcher3QuickStep" \
+	"$TMP/android/system/product/app/LatinIME"
+: >"$TMP/calls"
+OTTO_SETUP=wizard OTTO_ANDROID="$TMP/android" otto_hide_upstream_apps >/dev/null
+expect "upstream apps: home screens hidden too" \
+	"mknod TvLauncher|mknod Updater|mount $TMP/android/system/system_ext/priv-app|mknod Launcher3QuickStep|mount $TMP/android/system/product/app" \
+	"$(paste -sd'|' "$TMP/calls" | sed 's/mknod Updater|mknod TvLauncher/mknod TvLauncher|mknod Updater/')"
+: >"$TMP/calls"
+OTTO_SETUP=wizard OTTO_LAUNCHER=upstream OTTO_ANDROID="$TMP/android" otto_hide_upstream_apps >/dev/null
+expect "upstream apps: OTTO_LAUNCHER=upstream keeps the home screen" \
 	"mknod Updater|mount $TMP/android/system/system_ext/priv-app" "$(paste -sd'|' "$TMP/calls")"
 unset -f mknod mount
 

@@ -4,7 +4,7 @@ Turn an old PC or laptop into a fast, plug-and-play Android TV for any TV.
 Flash a USB stick, plug the computer into the TV over HDMI, try it live, then
 install it.
 
-> Status: **v0.4.5, early development.** Tested on one machine so far:
+> Status: **v0.5.0, early development.** Tested on one machine so far:
 > [Acer HM77 / Ivy Bridge](docs/hardware/acer-hm77-ivybridge.md).
 
 **What it needs:** a 64-bit PC with SSE4.2 (Android 14 requires it: Intel
@@ -36,7 +36,8 @@ USB stick
  │      │    │  (on a first boot, one that says it takes minutes)
  │      │    ├─ bind-mounts /otto on /boot/otto (Android only sees
  │      │    │  the media's /boot folder, so that's where it finds us)
- │      │    └─ hides upstream's setup wizard and updater (whiteouts)
+ │      │    └─ hides upstream's setup wizard, updater and home screen
+ │      │       (whiteouts; Otto TV has its own)
  │      └─ install mode: makes Calamares Otto TV's installer
  │           ├─ runs it from RAM (the stick can come out any time after)
  │           ├─ 4 steps, Otto's branding, Portuguese, GRUB without asking
@@ -49,6 +50,8 @@ USB stick
         ├─ redraws Otto in text once the GPU driver has the screen
         ├─ first boot: "Almost ready" over the still-empty home screen
         ├─ finds the HDMI output with a TV attached and routes audio to it
+        │  (unless the quick panel sent the sound to the laptop)
+        ├─ makes Otto TV's launcher the home screen, with its permissions
         ├─ picks the on-screen keyboard (none with a physical keyboard)
         └─ starts otto-remote, the phone remote   ← ours: remote/ (Go)
 ```
@@ -61,7 +64,10 @@ USB stick
   nothing to install)                                         ├─ pairs phones (QR or PIN)
                                                               └─ /dev/uinput: virtual keyboard
  TV: "Connect phone" app ── WebView on 127.0.0.1 ──▶ QR code      and mouse that Android
-     (tvapp/, ~30 KB)                                             treats like USB ones
+     (tvapp/)                                                     treats like USB ones
+ TV: home screen ────────── /app/ on 127.0.0.1 ─────▶ sound, laptop screen, restart,
+     (tvapp/, home/)        (only this app: checked     system details, QR code
+                             by uid in /proc/net/tcp)
 ```
 
 Android won't let an app type into other apps, but the boot hooks run as
@@ -88,6 +94,22 @@ moving to a new upstream release is mostly bumping the ISO hash.
 
 ## Features
 
+- **Otto TV's own home screen.** Favorites up top (big banners, each
+  tinted with the app's own color), recently used apps below, and every app
+  a click away, sorted by name. Hold OK (or press Menu) on an app to pin,
+  move, uninstall or see its info. A Wi-Fi notice when the TV is offline,
+  the time, and the phone remote's status at a glance. Drawn natively at
+  1080p with the design's Inter typeface; it replaces upstream's launcher
+  (`OTTO_LAUNCHER=upstream` brings that one back). If it ever crashes twice
+  in a row, it opens as a plain list of apps instead of leaving the TV on a
+  black screen.
+- **Quick panel (F2, Ctrl+Alt+Del) and shortcuts (F1).** Over any app:
+  where the sound goes (TV or laptop speakers, remembered across boots), the
+  laptop screen, Wi-Fi, connecting another phone, suspend/restart/turn off
+  and the system's details (CPU temperature and use, memory, IP, adb).
+  F1 lists the keyboard and mouse shortcuts, with the phone remote's QR
+  code. Small notices confirm what happened ("Celular conectado", the app
+  that Alt+F4 closed, the laptop screen going dark).
 - **Phone remote, no app to install.** Scan the QR code on the TV and the
   phone's browser becomes a remote: directional pad, OK, back, home, volume,
   play/pause, a touchpad and a keyboard that types on the TV (accents
@@ -96,12 +118,12 @@ moving to a new upstream release is mostly bumping the ISO hash.
 - **Laptop keyboards that make sense on a TV.** Esc goes back (there is no
   Back key on a PC keyboard, and Android TV apps rely on one), the Windows
   key goes home, Alt+F4 closes the app on screen (on the home screen it
-  opens the power menu, like on a Windows desktop) and Ctrl+Alt+Del opens
-  the power menu. The shortcuts come from the phone remote's service, which
+  opens the power options, like on a Windows desktop), Ctrl+Alt+Del opens
+  the power options, F1 the shortcuts and F2 the quick panel. The shortcuts come from the phone remote's service, which
   reads the keyboard without taking keys away from Android. And the
   on-screen keyboard stays out of the way when a physical keyboard is
-  plugged in. Android TV's keyboard ignores that setting on purpose, so TV
-  Box switches to its own invisible keyboard, where Enter does what the TV
+  plugged in. Android TV's keyboard ignores that setting on purpose, so
+  Otto TV switches to its own invisible keyboard, where Enter does what the TV
   keyboard's "›" button does (screens like the Wi-Fi password only continue
   on it). Upstream maps the big Enter key to the remote's OK, which is great
   in menus and does nothing in a text field, so in text fields that key is
@@ -154,8 +176,8 @@ moving to a new upstream release is mostly bumping the ISO hash.
 ## Build
 
 Needs Linux (WSL works) with `xorriso`, `curl`, `python3`, Go, a JDK and a
-slice of the Android SDK (for Otto TV's own 30 KB app: the "Connect phone"
-screen and the physical-keyboard keyboard):
+slice of the Android SDK (for Otto TV's own app, about 400 KB: the home
+screen, the "Connect phone" screen and the physical-keyboard keyboard):
 
 ```sh
 sudo apt install xorriso curl python3 golang openjdk-17-jdk-headless zip
@@ -197,6 +219,7 @@ in Android's `init.sh`, which both upstream and our hooks read.
 | `OTTO_IME`        | `auto`              | `tv` always uses the TV keyboard, `hard` never shows one |
 | `OTTO_REMOTE`     | `on`                | `off` doesn't start the phone remote (nor the keyboard shortcuts) |
 | `OTTO_SETUP`      | `ours`              | `wizard` keeps upstream's setup wizard |
+| `OTTO_LAUNCHER`   | `ours`              | `upstream` keeps upstream's home screen (and leaves the home screen choice alone) |
 | `SET_TZ_LOCATION` | `America/Sao_Paulo` | Time zone (upstream option) |
 
 To try one without rebuilding, press `e` on a menu entry, append it to the
@@ -215,7 +238,9 @@ against the real upstream `settings.conf`, the installer job against a fake
 Calamares, the F-Droid helper, the TV app's Enter key logic, and the phone
 remote (`remote/`, `go test`:
 typing, held keys, pairing, the TV-only routes and a WebSocket session
-against a fake keyboard).
+against a fake keyboard; the launcher's routes, who may call them, the
+sound switch and the shortcuts). The launcher is drawn by hand, so its
+layout math (`tvapp/test/HomeMathTest.java`) runs here too.
 
 `tools/device/input-test.sh` collects input diagnostics from a running box
 and tries the keyboard fixes live, without a new ISO.
@@ -239,6 +264,8 @@ options, rooted debugging and network debugging, then
 - **App verification:** apps come over HTTPS from f-droid.org, picked through
   F-Droid's v1 API. F-Droid recommends its signed index for fetching apps;
   verifying against it is on the roadmap.
+- **The home screen is new in v0.5:** checked screen by screen against the
+  design off-device; its first run on the Acer is next.
 - **Wi-Fi and keyboard layout** are set by hand in Settings for now (Wi-Fi
   passwords can be typed from the phone remote).
 - **The phone remote is new in v0.3** and its uinput side has only run in

@@ -133,6 +133,8 @@ public class HomeActivity extends Activity implements AppMenu.Listener {
 
     private Remote.Status status = new Remote.Status(null);
     private boolean resumed;
+    /** The plain list of apps, after repeated crashes (see SafeHome). */
+    private boolean safe;
     private boolean enterHeld;
     private final Runnable longPress = this::onLongPress;
     private final Runnable clockTick = this::tickClock;
@@ -142,6 +144,16 @@ public class HomeActivity extends Activity implements AppMenu.Listener {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        SafeHome.install(this);
+        if (SafeHome.looping(this, System.currentTimeMillis())) {
+            // Crashing again and again: the apps as a plain list instead.
+            safe = true;
+            SafeHome.show(this, () -> {
+                SafeHome.reset(this);
+                recreate();
+            });
+            return;
+        }
         ui = Ui.of(this);
         store = new Store(this);
         net = new Net(this, (kind, bars) -> {
@@ -170,7 +182,9 @@ public class HomeActivity extends Activity implements AppMenu.Listener {
 
     @Override
     protected void onDestroy() {
-        unregisterReceiver(packages);
+        if (!safe) {
+            unregisterReceiver(packages);
+        }
         handler.removeCallbacksAndMessages(null);
         super.onDestroy();
     }
@@ -178,6 +192,9 @@ public class HomeActivity extends Activity implements AppMenu.Listener {
     @Override
     protected void onResume() {
         super.onResume();
+        if (safe) {
+            return;
+        }
         resumed = true;
         shown = this;
         net.start();
@@ -190,6 +207,9 @@ public class HomeActivity extends Activity implements AppMenu.Listener {
     @Override
     protected void onPause() {
         super.onPause();
+        if (safe) {
+            return;
+        }
         resumed = false;
         if (shown == this) {
             shown = null;
@@ -204,6 +224,9 @@ public class HomeActivity extends Activity implements AppMenu.Listener {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        if (safe) {
+            return;
+        }
         // Home pressed (here or in an app): back to the top of the home screen.
         if (Intent.ACTION_MAIN.equals(intent.getAction())) {
             goHome();
@@ -697,6 +720,9 @@ public class HomeActivity extends Activity implements AppMenu.Listener {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
+        if (safe) {
+            return super.dispatchKeyEvent(e);
+        }
         int code = e.getKeyCode();
         boolean down = e.getAction() == KeyEvent.ACTION_DOWN;
         boolean first = down && e.getRepeatCount() == 0;
@@ -772,6 +798,9 @@ public class HomeActivity extends Activity implements AppMenu.Listener {
 
     @Override
     public boolean dispatchGenericMotionEvent(MotionEvent e) {
+        if (safe) {
+            return super.dispatchGenericMotionEvent(e);
+        }
         if (e.isFromSource(InputDevice.SOURCE_CLASS_POINTER)) {
             if (e.getActionMasked() == MotionEvent.ACTION_BUTTON_PRESS
                     && e.getActionButton() == MotionEvent.BUTTON_SECONDARY) {
@@ -796,6 +825,9 @@ public class HomeActivity extends Activity implements AppMenu.Listener {
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent e) {
+        if (safe) {
+            return super.dispatchTouchEvent(e);
+        }
         // The secondary button's own down/up must not click what's under it.
         if ((e.getButtonState() & MotionEvent.BUTTON_SECONDARY) != 0) {
             return true;
@@ -1401,6 +1433,10 @@ public class HomeActivity extends Activity implements AppMenu.Listener {
 
     /** For tests: what is focused right now, as "screen/zone/index". */
     String focusForTest() {
+        if (safe) {
+            View f = getCurrentFocus();
+            return "safe/" + (f instanceof android.widget.Button ? ((android.widget.Button) f).getText() : "");
+        }
         return screen + "/" + zone + "/" + (screen == GRID ? gridIdx : zone == FAV ? favIdx : zone == APPS ? appIdx : heroIdx)
                 + (menu.shown() ? "/menu" + menuOpt : "") + (moving ? "/moving" : "");
     }

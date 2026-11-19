@@ -34,6 +34,12 @@ type Server struct {
 	TVPage  *template.Template // the "Connect phone" screen
 	LANIP   func() string      // the TV's address on the home network
 	Audio   func() string      // where the sound goes: "tv", "notebook" or ""; may be nil
+	Peers   PeerCheck          // who may use /app/ (the launcher); nil: nobody
+	System  System             // what /app/ can change; may be nil
+	// Notify shows a notice on the TV over any app (tvapp's ToastReceiver):
+	// "phone", "screen_off", "screen_on" or "closed" (with the app's
+	// package). May be nil.
+	Notify func(kind, app string)
 
 	phones  atomic.Int32
 	pairsAt atomic.Int64 // unix nanos of the last phone that connected
@@ -66,6 +72,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/pair", s.handlePair)
 	mux.HandleFunc("GET /tv", s.onlyFromTV(s.handleTV))
 	mux.HandleFunc("GET /tv/status", s.onlyFromTV(s.handleTVStatus))
+	s.appRoutes(mux)
 	return headers(mux)
 }
 
@@ -98,6 +105,14 @@ func (s *Server) onlyFromTV(h http.HandlerFunc) http.HandlerFunc {
 		if err != nil || !net.ParseIP(host).IsLoopback() || !isLoopbackHost(r.Host) {
 			http.Error(w, "only available on the TV", http.StatusForbidden)
 			return
+		}
+		// Only Otto TV's app should read this screen (it shows the token).
+		// For now just noted: the next release turns it into a check once
+		// the logs show the WebView's requests come from the app itself.
+		if s.Peers != nil {
+			if ok, err := s.Peers.Allowed(r.RemoteAddr, s.Port); !ok {
+				log.Printf("tv screen read by another app (%s): %v", r.RemoteAddr, err)
+			}
 		}
 		h(w, r)
 	}
@@ -168,6 +183,11 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.Pairing.MarkPaired()
+	if hello.Fresh {
+		// Just paired (QR code or code typed on the phone), not a phone
+		// coming back: say so on the TV.
+		s.notify("phone", "")
+	}
 	s.phones.Add(1)
 	s.pairsAt.Store(time.Now().UnixNano())
 	defer s.phones.Add(-1)
@@ -199,6 +219,7 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 			if _, err := s.Laptop.Toggle(); err != nil {
 				log.Printf("laptop screen: %v", err)
 			}
+			s.notify("screen_"+s.laptopState(), "")
 			wsjson.Write(ctx, c, map[string]string{"type": "laptop", "laptop": s.laptopState()})
 			continue
 		}
@@ -285,6 +306,12 @@ func (s *Server) handleTVStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) notify(kind, app string) {
+	if s.Notify != nil {
+		go s.Notify(kind, app)
+	}
+}
+
 func (s *Server) audio() string {
 	if s.Audio == nil {
 		return ""
@@ -331,7 +358,7 @@ var tvTexts = map[string]map[string]string{
 		"wifiText":   "Depois disso, o código para conectar o celular aparece aqui.",
 		"wifiButton": "Escolher rede Wi-Fi",
 		"bluetooth":  "Parear controle Bluetooth",
-		"skip":       "Aperte Voltar para pular. Esta tela fica em Conectar celular, na lista de apps.",
+		"skip":       "Aperte Voltar para pular. Esta tela fica em Conectar celular, no painel rápido.",
 		"another":    "Conectar outro celular",
 		"online":     "Wi-Fi conectado",
 		"offline":    "Sem internet",
@@ -355,7 +382,7 @@ var tvTexts = map[string]map[string]string{
 		"wifiText":   "Then the code to connect your phone shows up here.",
 		"wifiButton": "Choose a Wi-Fi network",
 		"bluetooth":  "Pair a Bluetooth remote",
-		"skip":       "Press Back to skip. This screen stays in Connect phone, in your apps.",
+		"skip":       "Press Back to skip. This screen stays in Connect phone, in the quick panel.",
 		"another":    "Connect another phone",
 		"online":     "Wi-Fi connected",
 		"offline":    "No internet",

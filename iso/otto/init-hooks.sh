@@ -9,6 +9,10 @@
 #
 # Only function definitions live here: init.sh runs its own code after us.
 
+# otto-remote's folder: its copy of itself, the paired phones, the laptop
+# screen's and the sound's choices.
+OTTO_STATE=${OTTO_STATE:-/data/misc/otto}
+
 otto_log() {
 	# /dev/kmsg works this early (read it with `dmesg`); logcat once logd is up.
 	echo "otto: $*" >"${OTTO_KMSG:-/dev/kmsg}" 2>/dev/null
@@ -93,6 +97,12 @@ otto_find_hdmi_pcm() {
 # Points the x86 audio HAL at the HDMI output that has a TV on it. The HAL
 # only uses its HDMI slot when hal.audio.primary.hdmi is set: with
 # hal.audio.out alone it parks the HDMI device and finds no output (-19).
+#
+# Unless the quick panel sent the sound to the laptop: otto-remote keeps
+# that choice in $OTTO_STATE/audio and switches by changing the same two
+# properties. otto.audio.hdmi keeps the TV's output either way, so the
+# panel can send the sound back to it.
+OTTO_TV_SOUND_PROP=otto.audio.hdmi
 otto_setup_audio() {
 	local pcm
 	if [ "${OTTO_AUDIO:-auto}" != "auto" ]; then
@@ -101,6 +111,11 @@ otto_setup_audio() {
 	fi
 	if ! pcm=$(otto_find_hdmi_pcm); then
 		otto_log "audio: no display on HDMI, keeping the default output"
+		return 1
+	fi
+	setprop "$OTTO_TV_SOUND_PROP" "$pcm"
+	if [ "$(cat "$OTTO_STATE/audio" 2>/dev/null)" = notebook ]; then
+		otto_log "audio: display on HDMI ($pcm), sound kept on the laptop (quick panel)"
 		return 1
 	fi
 	setprop hal.audio.primary.hdmi 1
@@ -172,8 +187,6 @@ otto_setup_ime() {
 # otto-remote serves the phone remote page and types what it sends through
 # virtual input devices. Our initrd hook makes our files visible at
 # /boot/otto (OTTO_DIR only exists so tests can point elsewhere).
-
-OTTO_STATE=/data/misc/otto
 OTTO_CONNECT_APP=app.ottotv.connect/.ConnectActivity
 
 otto_start_remote() {
@@ -210,6 +223,42 @@ otto_offer_pairing() {
 		otto_log "remote: showing the pairing screen"
 	else
 		otto_log "remote: could not open the pairing screen"
+	fi
+}
+
+# ---- Home screen ---------------------------------------------------------------
+# Our launcher (tvapp/, home/HomeActivity) replaces upstream's, which our
+# initrd hook hides (otto_hide_upstream_apps; OTTO_LAUNCHER=upstream keeps
+# it). Two of its permissions are ones a user would grant in Settings:
+# usage access, for "recently used", and showing over other apps, for the
+# notices over the app on screen. As a system app, it gets them here.
+OTTO_HOME_APP=app.ottotv.connect/.home.HomeActivity
+
+otto_setup_home() {
+	local app="${OTTO_HOME_APP%%/*}" home
+	appops set "$app" GET_USAGE_STATS allow >/dev/null 2>&1
+	appops set "$app" SYSTEM_ALERT_WINDOW allow >/dev/null 2>&1
+	if [ "${OTTO_LAUNCHER:-ours}" = upstream ]; then
+		otto_log "home: OTTO_LAUNCHER=upstream, keeping upstream's home screen"
+		return 0
+	fi
+	home=$(cmd package resolve-activity --brief -a android.intent.action.MAIN \
+		-c android.intent.category.HOME 2>/dev/null | tail -n 1)
+	case "$home" in
+	"$app"/*) return 0 ;;
+	*/*)
+		# A launcher the user installed and picked stays theirs.
+		if pm list packages -3 2>/dev/null | grep -qx "package:${home%%/*}"; then
+			otto_log "home: keeping the user's launcher, ${home%%/*}"
+			return 0
+		fi
+		;;
+	esac
+	# Otherwise ours, without Android asking which one on the Home key.
+	if cmd package set-home-activity "$OTTO_HOME_APP" >/dev/null 2>&1; then
+		otto_log "home: Otto TV's home screen (was ${home:-none})"
+	else
+		otto_log "home: could not make ours the home screen"
 	fi
 }
 
@@ -365,6 +414,7 @@ otto_bootcomplete_early() {
 	otto_setup_done
 	otto_start_remote && remote=1
 	otto_wait_for_apps
+	otto_setup_home
 	otto_setup_ime
 	[ -z "$remote" ] || otto_offer_pairing
 	# "Almost ready" can go (otto_show_preparing).

@@ -126,3 +126,89 @@ func TestLaptopScreenKey(t *testing.T) {
 	}
 	(&Android{}).Do(ToggleLaptopScreen) // desktop: nothing to do, no panic
 }
+
+const app = "app.ottotv.connect"
+
+func TestF1AndF2OpenTheLaunchersScreens(t *testing.T) {
+	a, calls := fakeAndroid("com.stremio.one", true)
+	a.App = app
+	a.Do(Shortcuts)
+	a.Do(QuickPanel)
+	want := "[am start -n app.ottotv.connect/.home.ShortcutsActivity am start -n app.ottotv.connect/.home.PanelActivity]"
+	if fmt.Sprint(*calls) != want {
+		t.Errorf("got %v", *calls)
+	}
+}
+
+func TestF1AndF2LeaveTheLauncherAlone(t *testing.T) {
+	// The launcher's own screens take F1 and F2 (and close on them).
+	a, calls := fakeAndroid(app, true)
+	a.App = app
+	a.Do(Shortcuts)
+	a.Do(QuickPanel)
+	if len(*calls) != 0 {
+		t.Errorf("got %v", *calls)
+	}
+	// Without the launcher's app, F1 and F2 do nothing.
+	b, calls := fakeAndroid("com.stremio.one", true)
+	b.Do(Shortcuts)
+	b.Do(QuickPanel)
+	if len(*calls) != 0 {
+		t.Errorf("no app: got %v", *calls)
+	}
+}
+
+func TestPowerMenuIsTheQuickPanel(t *testing.T) {
+	a, calls := fakeAndroid("com.stremio.one", true)
+	a.App = app
+	a.Do(PowerMenu)
+	if fmt.Sprint(*calls) != "[am start -n app.ottotv.connect/.home.PanelActivity --es focus power]" {
+		t.Errorf("got %v", *calls)
+	}
+}
+
+func TestPowerMenuFallsBackWhenThePanelWontOpen(t *testing.T) {
+	a, calls := fakeAndroid("com.stremio.one", true)
+	a.App = app
+	run := a.Run
+	a.Run = func(name string, args ...string) ([]byte, error) {
+		if name == "am" && args[0] == "start" {
+			return nil, errors.New("Activity class does not exist")
+		}
+		return run(name, args...)
+	}
+	a.Do(PowerMenu)
+	if fmt.Sprint(*calls) != "[press 116 release 116]" {
+		t.Errorf("got %v", *calls)
+	}
+}
+
+func TestClosingAnAppShowsANotice(t *testing.T) {
+	a, _ := fakeAndroid("com.stremio.one", true)
+	var got []string
+	a.Notify = func(kind, pkg string) { got = append(got, kind+" "+pkg) }
+	a.Do(CloseApp)
+	if fmt.Sprint(got) != "[closed com.stremio.one]" {
+		t.Errorf("got %v", got)
+	}
+	// Nothing closed, nothing to say.
+	b, _ := fakeAndroid("com.android.systemui", true)
+	got = nil
+	b.Notify = a.Notify
+	b.Do(CloseApp)
+	if len(got) != 0 {
+		t.Errorf("systemui: got %v", got)
+	}
+}
+
+func TestLaptopScreenKeyShowsANotice(t *testing.T) {
+	a, _ := fakeAndroid("com.stremio.one", true)
+	a.Laptop = &countingLaptop{}
+	var got []string
+	a.Notify = func(kind, _ string) { got = append(got, kind) }
+	a.Do(ToggleLaptopScreen)
+	a.Do(ToggleLaptopScreen)
+	if fmt.Sprint(got) != "[screen_off screen_on]" {
+		t.Errorf("got %v", got)
+	}
+}

@@ -84,6 +84,9 @@ function saveToken(value) {
   token = value;
 }
 let token = loadToken();
+// The token was just handed over (QR code or typed code): the TV says
+// "Phone connected" once, when this phone is accepted.
+let fresh = false;
 
 // The QR code carries the token in the URL fragment (#t=...), which never
 // reaches the server. Keep it and clean the address bar.
@@ -91,6 +94,7 @@ function takeTokenFromURL() {
   const m = location.hash.match(/[#&]t=([0-9a-f]{64})/);
   if (m) {
     saveToken(m[1]);
+    fresh = true;
     history.replaceState(null, '', location.pathname);
   }
 }
@@ -161,12 +165,13 @@ function connect() {
   if (ws && ws.readyState <= 1) return;
   const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${scheme}://${location.host}/ws`);
-  ws.onopen = () => ws.send(JSON.stringify({ type: 'auth', token }));
+  ws.onopen = () => ws.send(JSON.stringify({ type: 'auth', token, fresh }));
   ws.onmessage = (e) => {
     let m;
     try { m = JSON.parse(e.data); } catch { return; }
     if (m.type === 'ready') {
       ready = true;
+      fresh = false;
       retries = 0;
       $('#tv-name').textContent = m.name || 'TV';
       setStatus(m.input ? 'on' : 'noinput');
@@ -482,6 +487,7 @@ async function pair(pin) {
     const body = await res.json().catch(() => ({}));
     if (res.ok && body.token) {
       saveToken(body.token);
+      fresh = true;
       showRemote();
     } else {
       pairError('code', body.error === 'wrong_pin' ? t('wrongPin') : t('pairClosed'));

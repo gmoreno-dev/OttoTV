@@ -47,6 +47,8 @@ public class PanelActivity extends Activity {
     static final float LEFT = 1120;
     static final float TOP = 54;
     static final float WIDTH = 704;
+    /** The status, with the Wi-Fi network's name (only the panel shows it). */
+    private static final String STATUS = "/app/status?wifi=1";
 
     /** The panel on screen, if any: notices go into it instead of over it. */
     static PanelActivity shown;
@@ -96,7 +98,7 @@ public class PanelActivity extends Activity {
         setContentView(root);
         veil.animate().alpha(1).setDuration(180).start();
         build(status != null && !status.laptop.isEmpty(), getIntent().getStringExtra(EXTRA_FOCUS));
-        Remote.get("/app/status", this::onStatus);
+        Remote.get(STATUS, this::onStatus);
     }
 
     @Override
@@ -114,7 +116,7 @@ public class PanelActivity extends Activity {
         shown = this;
         net.start();
         tickClock();
-        Remote.get("/app/status", this::onStatus);
+        Remote.get(STATUS, this::onStatus);
     }
 
     @Override
@@ -288,6 +290,14 @@ public class PanelActivity extends Activity {
     private void onStatus(JSONObject j) {
         if (isDestroyed() || j == null) {
             return;
+        }
+        if (!j.has("ssid") && status != null && !status.ssid.isEmpty()) {
+            // Answers to the panel's actions leave the network's name out.
+            try {
+                j.put("ssid", status.ssid);
+            } catch (org.json.JSONException e) {
+                // shown without it
+            }
         }
         status = new Remote.Status(j);
         Remote.last = status;
@@ -465,7 +475,7 @@ public class PanelActivity extends Activity {
         Remote.post("/app/audio", Remote.body("to", to), (j) -> {
             if (j == null) {
                 showToast(Icons.SPEAKER, getString(R.string.panel_sound_failed), null);
-                Remote.get("/app/status", this::onStatus);
+                Remote.get(STATUS, this::onStatus);
                 return;
             }
             onStatus(j);
@@ -501,11 +511,10 @@ public class PanelActivity extends Activity {
                 }
             }
             refresh(true);
+            // The state is the user's choice: otto-remote keeps the screen lit
+            // on its own while the TV isn't showing the picture.
             if ("off".equals(state)) {
                 showToast(Icons.LAPTOP_OFF, getString(R.string.toast_screen_off), getString(R.string.toast_screen_off_sub));
-            } else if (!on) {
-                // It stays lit while the TV isn't showing the picture.
-                showToast(Icons.LAPTOP, getString(R.string.panel_screen_kept), getString(R.string.panel_screen_note));
             } else {
                 showToast(Icons.LAPTOP, getString(R.string.toast_screen_on), null);
             }

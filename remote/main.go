@@ -25,6 +25,7 @@ import (
 	"otto/remote/hotkeys"
 	"otto/remote/panel"
 	"otto/remote/server"
+	"otto/remote/system"
 	"otto/remote/uinput"
 	"otto/remote/web"
 )
@@ -35,12 +36,26 @@ var (
 	version     = "dev"
 )
 
+// notify shows a notice on the TV, over any app (tvapp's ToastReceiver).
+func notify(app, kind, pkg string) {
+	args := []string{"broadcast", "--include-stopped-packages", "-n", app + "/.home.ToastReceiver", "--es", "kind", kind}
+	if pkg != "" {
+		args = append(args, "--es", "app", pkg)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if out, err := exec.CommandContext(ctx, "am", args...).CombinedOutput(); err != nil {
+		log.Printf("notice %s: %v: %s", kind, err, strings.TrimSpace(string(out)))
+	}
+}
+
 func main() {
 	port := flag.Int("port", 8686, "HTTP port")
 	state := flag.String("state", "/data/misc/otto", "folder for the pairing token")
 	uinputPath := flag.String("uinput", "/dev/uinput", "uinput device")
 	name := flag.String("name", productName, "name shown on the phone")
 	useHotkeys := flag.Bool("hotkeys", true, "keyboard shortcuts: Alt+F4 closes the app, Ctrl+Alt+Del opens the power menu")
+	app := flag.String("app", "app.ottotv.connect", "Otto TV's app: the launcher, its quick panel and notices")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 	if *showVersion {
@@ -86,6 +101,19 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// The launcher's routes (/app/) only answer Otto TV's app.
+	srv.Peers = &server.Peers{
+		ProcNet:      []string{"/proc/net/tcp", "/proc/net/tcp6"},
+		PackagesList: "/data/system/packages.list",
+		Package:      *app,
+	}
+	sys := &system.Android{State: *state, Hooks: "/boot/otto/init-hooks.sh"}
+	if srv.Keys != nil {
+		sys.Keys = srv.Keys
+	}
+	srv.System = sys
+	srv.Notify = func(kind, pkg string) { notify(*app, kind, pkg) }
+
 	httpSrv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", *port),
 		Handler:           srv.Handler(),
@@ -122,7 +150,7 @@ func main() {
 	}
 
 	if *useHotkeys {
-		android := &hotkeys.Android{}
+		android := &hotkeys.Android{App: *app, Notify: srv.Notify}
 		if srv.Keys != nil {
 			android.Keys = srv.Keys
 		}

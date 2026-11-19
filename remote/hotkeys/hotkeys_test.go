@@ -50,6 +50,11 @@ func TestShortcuts(t *testing.T) {
 		{"Ctrl+Del", []ev{press(keyLeftCtrl), press(keyDelete)}, "[]"},
 		{"Del alone", []ev{press(keyDelete)}, "[]"},
 		{"laptop display switch key", []ev{press(keySwitchVideoMode)}, "[laptop screen]"},
+		{"F1", []ev{press(keyF1)}, "[shortcuts]"},
+		{"F2", []ev{press(keyF2)}, "[quick panel]"},
+		{"held F1 opens once", []ev{press(keyF1), repeat(keyF1), repeat(keyF1)}, "[shortcuts]"},
+		{"Alt+F1 is not F1", []ev{press(keyLeftAlt), press(keyF1)}, "[]"},
+		{"Ctrl+F2 is not F2", []ev{press(keyRightCtrl), press(keyF2)}, "[]"},
 		{"laptop screen-off key", []ev{press(keyDisplayOff), release(keyDisplayOff), press(keyDisplayOff)}, "[laptop screen laptop screen]"},
 	}
 	for _, c := range cases {

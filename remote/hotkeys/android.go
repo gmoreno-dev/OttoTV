@@ -25,8 +25,14 @@ type Laptop interface {
 
 // Android carries out shortcuts with Android's own tools.
 type Android struct {
-	Keys      Keys          // optional: holds Power for the power menu
-	Laptop    Laptop        // optional: the laptop screen
+	Keys   Keys   // optional: holds Power for the power menu
+	Laptop Laptop // optional: the laptop screen
+	// App is Otto TV's app (app.ottotv.connect): its quick panel is the
+	// power menu, and F1 and F2 open its shortcuts and quick panel. Empty:
+	// Android's own power menu, and no F1 or F2.
+	App string
+	// Notify shows a notice on the TV ("closed", with the app); may be nil.
+	Notify    func(kind, app string)
 	LongPress time.Duration // how long Power is held; 0 means 1.2s
 	// Run executes a command and returns its output; nil runs it for real.
 	Run func(name string, args ...string) ([]byte, error)
@@ -49,10 +55,37 @@ func (a *Android) Do(act Action) {
 		a.powerMenu()
 	case ToggleLaptopScreen:
 		if a.Laptop != nil {
-			if _, err := a.Laptop.Toggle(); err != nil {
+			off, err := a.Laptop.Toggle()
+			if err != nil {
 				log.Printf("hotkeys: laptop screen: %v", err)
 			}
+			if a.Notify != nil {
+				state := "screen_on"
+				if off {
+					state = "screen_off"
+				}
+				a.Notify(state, "")
+			}
 		}
+	case Shortcuts:
+		a.openOver(".home.ShortcutsActivity")
+	case QuickPanel:
+		a.openOver(".home.PanelActivity")
+	}
+}
+
+// openOver opens one of the launcher's screens over the app on screen. Not
+// over the launcher's own screens: they take F1 and F2 themselves (and
+// toggle on them).
+func (a *Android) openOver(activity string) {
+	if a.App == "" {
+		return
+	}
+	if out, err := a.run("dumpsys", "activity", "activities"); err == nil && TopPackage(string(out)) == a.App {
+		return
+	}
+	if _, err := a.run("am", "start", "-n", a.App+"/"+activity); err != nil {
+		log.Printf("hotkeys: open %s: %v", activity, err)
 	}
 }
 
@@ -80,12 +113,24 @@ func (a *Android) closeApp() {
 			return
 		}
 		log.Printf("hotkeys: closed %s", pkg)
+		if a.Notify != nil {
+			a.Notify("closed", pkg)
+		}
 	}
 }
 
-// powerMenu long-presses Power, which opens Android's power menu. Through
-// our virtual keyboard when there is one; `input` takes a second to start.
+// powerMenu opens the launcher's quick panel on Power. Without the launcher's
+// app it long-presses Power, which opens Android's power menu: through our
+// virtual keyboard when there is one; `input` takes a second to start.
 func (a *Android) powerMenu() {
+	if a.App != "" {
+		_, err := a.run("am", "start", "-n", a.App+"/.home.PanelActivity", "--es", "focus", "power")
+		if err == nil {
+			log.Printf("hotkeys: quick panel, power")
+			return
+		}
+		log.Printf("hotkeys: quick panel: %v", err)
+	}
 	hold := a.LongPress
 	if hold == 0 {
 		hold = 1200 * time.Millisecond

@@ -4,6 +4,7 @@
 //
 //	Alt+F4         close the app on screen (on the home screen: power menu)
 //	Ctrl+Alt+Del   power menu (turn off, restart)
+//	F1, F2         the launcher's shortcuts and quick panel, over any app
 //	display keys   laptop screen dark/lit: the Fn keys with a screen on
 //	               them (KEY_SWITCHVIDEOMODE, KEY_DISPLAY_OFF), when the
 //	               laptop sends one
@@ -33,6 +34,8 @@ const (
 	CloseApp
 	PowerMenu
 	ToggleLaptopScreen
+	Shortcuts
+	QuickPanel
 )
 
 func (a Action) String() string {
@@ -43,6 +46,10 @@ func (a Action) String() string {
 		return "power menu"
 	case ToggleLaptopScreen:
 		return "laptop screen"
+	case Shortcuts:
+		return "shortcuts"
+	case QuickPanel:
+		return "quick panel"
 	}
 	return "none"
 }
@@ -51,6 +58,8 @@ func (a Action) String() string {
 const (
 	keyLeftCtrl  = 29
 	keyLeftAlt   = 56
+	keyF1        = 59
+	keyF2        = 60
 	keyF4        = 62
 	keyKPDot     = 83 // keypad Del with Num Lock off
 	keyRightCtrl = 97
@@ -100,6 +109,10 @@ func (t *Tracker) Feed(typ, code uint16, value int32) Action {
 		return PowerMenu
 	case code == keySwitchVideoMode || code == keyDisplayOff:
 		return ToggleLaptopScreen
+	case code == keyF1 && !alt && !ctrl:
+		return Shortcuts
+	case code == keyF2 && !alt && !ctrl:
+		return QuickPanel
 	}
 	return None
 }

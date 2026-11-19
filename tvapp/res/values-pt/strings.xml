@@ -51,7 +51,6 @@
     <string name="panel_screen_note">Só apaga quando a TV está mostrando a imagem</string>
     <string name="panel_screen_on">Acesa</string>
     <string name="panel_screen_off">Apagada</string>
-    <string name="panel_screen_kept">A tela do notebook continua acesa</string>
     <string name="panel_screen_failed">Não deu para mudar a tela do notebook</string>
     <string name="panel_wifi">Wi-Fi</string>
     <string name="panel_network">Rede</string>
@@ -127,4 +126,7 @@
         <item quantity="one">%1$d app</item>
         <item quantity="other">%1$d apps</item>
     </plurals>
+    <string name="safe_title">A tela inicial do Otto TV teve um problema</string>
+    <string name="safe_note">Seus apps estão todos aqui. Tente abrir a tela inicial completa de novo, ou reinicie a TV.</string>
+    <string name="safe_retry">Abrir a tela inicial completa</string>
 </resources>

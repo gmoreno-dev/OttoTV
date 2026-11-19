@@ -41,6 +41,9 @@ type Message struct {
 	DX     float64 `json:"dx,omitempty"`
 	DY     float64 `json:"dy,omitempty"`
 	Button string  `json:"button,omitempty"`
+	// Fresh: the phone just got the token (QR code or typed code), sent
+	// with "auth". Reconnecting phones leave it out.
+	Fresh bool `json:"fresh,omitempty"`
 }
 
 // Named keys the phone can send, mapped to what Android expects from a TV

@@ -83,16 +83,36 @@ otto_fix_zram() {
 		otto_msg "zram: fixed upstream's setup script"
 }
 
-# Our app (pairing screen, physical keyboard IME) goes in as a system app,
-# so it is there from the first moment instead of after upstream installs
-# its user apps.
+# Our app (home screen, pairing screen, physical keyboard IME) goes in as a
+# system app, so it is there from the first moment instead of after
+# upstream installs its user apps. Upstream's home screen, if it lives in
+# the same folder, is hidden in the same overlay (see otto_upstream_launchers;
+# a second overlay on this one could go past the kernel's stacking limit).
 otto_system_apps() {
 	local target="${OTTO_ANDROID:-/android}/system/app"
 	local extra="/mnt/$SRC/otto/system_app"
+	local layer="${OTTO_TMP:-/tmp}/otto-system_app-whiteouts" lower="$extra" name hidden=""
 
 	[ -d "$target" ] && [ -d "$extra" ] || return 0
-	mount -t overlay -o "lowerdir=$extra:$target" overlay "$target" &&
-		otto_msg "system apps added"
+	for name in $(otto_upstream_launchers "$target"); do
+		mkdir -p "$layer"
+		mknod "$layer/$name" c 0 0 && hidden="$hidden $name"
+	done
+	[ -n "$hidden" ] && lower="$layer:$extra"
+	mount -t overlay -o "lowerdir=$lower:$target" overlay "$target" &&
+		otto_msg "system apps added${hidden:+, hid$hidden}"
+}
+
+# Upstream's home screen, which our launcher (tvapp/, home/) replaces.
+# Prints the folders in an app folder that hold it, matched by name since
+# it isn't the same everywhere. OTTO_LAUNCHER=upstream keeps it.
+# Usage: otto_upstream_launchers <app folder>
+otto_upstream_launchers() {
+	local app
+	[ "${OTTO_LAUNCHER:-ours}" = upstream ] && return 0
+	for app in "$1"/*[Ll]auncher*; do
+		[ -d "$app" ] && echo "${app##*/}"
+	done
 }
 
 
@@ -186,13 +206,18 @@ otto_hide() {
 #    pairing stays in Settings, and init-hooks.sh marks setup as done.
 #    OTTO_SETUP=wizard on the kernel command line keeps it;
 #  - the LineageOS updater, which would offer LineageOS builds. Otto TV
-#    updates with its own files (tools/device/update.sh, then a new ISO).
+#    updates with its own files (tools/device/update.sh, then a new ISO);
+#  - the home screen (otto_upstream_launchers): Otto TV has its own. Its
+#    copy in system/app, if any, is hidden by otto_system_apps.
 otto_hide_upstream_apps() {
 	local dir app found
 	local sys="${OTTO_ANDROID:-/android}/system"
 	[ "${OTTO_SETUP:-ours}" = wizard ] &&
 		otto_msg "setup: OTTO_SETUP=wizard, keeping upstream's wizard"
-	for dir in "$sys/priv-app" "$sys/system_ext/priv-app" "$sys/product/priv-app"; do
+	[ "${OTTO_LAUNCHER:-ours}" = upstream ] &&
+		otto_msg "home: OTTO_LAUNCHER=upstream, keeping upstream's home screen"
+	for dir in "$sys/priv-app" "$sys/system_ext/priv-app" "$sys/product/priv-app" \
+		"$sys/system_ext/app" "$sys/product/app"; do
 		found=""
 		for app in "$dir"/*SetupWizard* "$dir"/Updater; do
 			[ -e "$app" ] || continue
@@ -200,6 +225,9 @@ otto_hide_upstream_apps() {
 			*SetupWizard*) [ "${OTTO_SETUP:-ours}" = wizard ] && continue ;;
 			esac
 			found="$found ${app##*/}"
+		done
+		for app in $(otto_upstream_launchers "$dir"); do
+			found="$found $app"
 		done
 		[ -n "$found" ] || continue
 		# shellcheck disable=SC2086  # one word per app folder

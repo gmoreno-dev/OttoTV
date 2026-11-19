@@ -51,7 +51,6 @@
     <string name="panel_screen_note">Only goes dark while the TV shows the picture</string>
     <string name="panel_screen_on">On</string>
     <string name="panel_screen_off">Off</string>
-    <string name="panel_screen_kept">The laptop screen stays on</string>
     <string name="panel_screen_failed">Couldn\'t change the laptop screen</string>
     <string name="panel_wifi">Wi-Fi</string>
     <string name="panel_network">Network</string>
@@ -127,4 +126,7 @@
         <item quantity="one">%1$d app</item>
         <item quantity="other">%1$d apps</item>
     </plurals>
+    <string name="safe_title">Otto TV\'s home screen ran into a problem</string>
+    <string name="safe_note">Your apps are all here. Try the full home screen again, or restart the TV.</string>
+    <string name="safe_retry">Open the full home screen</string>
 </resources>
