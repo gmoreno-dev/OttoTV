@@ -10,6 +10,20 @@ on:
         required: false
 
 jobs:
+  # The newest ShellCheck: older ones (24.04 has 0.9) flag things that aren't
+  # wrong.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint shell scripts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+          shellcheck -x -P SCRIPTDIR/.. build.sh tools/*.sh tests/run.sh
+          shellcheck -s sh iso/scripts/9-otto iso/otto/init-hooks.sh iso/otto/installer/otto-restart tools/device/*.sh
+
   test:
     # Not 26.04 yet: its C library is built for newer CPUs, so the MOVBE
     # tests can't run a program as an Ivy Bridge there.
@@ -17,12 +31,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Lint shell scripts
+      - name: Tools for the tests
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq shellcheck mksh qemu-user
-          shellcheck -x -P SCRIPTDIR/.. build.sh tools/*.sh tests/run.sh
-          shellcheck -s sh iso/scripts/9-otto iso/otto/init-hooks.sh iso/otto/installer/otto-restart tools/device/*.sh
+          sudo apt-get install -y -qq mksh qemu-user
 
       - uses: actions/setup-go@v5
         with:
@@ -51,7 +63,7 @@ jobs:
   # Manual only: downloads ~2.4 GB and produces an ISO of the same size.
   iso:
     if: github.event_name == 'workflow_dispatch'
-    needs: test
+    needs: [lint, test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
