@@ -11,7 +11,9 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Not 26.04 yet: its C library is built for newer CPUs, so the MOVBE
+    # tests can't run a program as an Ivy Bridge there.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 

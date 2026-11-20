@@ -877,8 +877,17 @@ unset -f movbe
 if command -v cc >/dev/null && command -v qemu-x86_64 >/dev/null; then
 	cc -O2 -static -o "$TMP/movbe_test" "$ROOT/native/movbe/movbe_test.c" "$ROOT/native/movbe/movbe.c"
 	expect "movbe: library tests on this CPU" "movbe: all good" "$("$TMP/movbe_test" 2>&1)"
-	expect "movbe: library tests on an Ivy Bridge" "movbe: all good" \
-		"$(qemu-x86_64 -cpu IvyBridge "$TMP/movbe_test" 2>&1 | grep -v 'uncaught target signal')"
+	# Some distributions build their C library for newer CPUs (Ubuntu
+	# 26.04's amd64v3 uses MOVBE and AVX2 itself): then nothing static
+	# starts on an Ivy Bridge, ours or not.
+	printf '#include <stdio.h>\nint main(void) { puts("hello"); return 0; }\n' >"$TMP/hello.c"
+	cc -O2 -static -o "$TMP/hello" "$TMP/hello.c"
+	if [ "$(qemu-x86_64 -cpu IvyBridge "$TMP/hello" 2>/dev/null)" = hello ]; then
+		expect "movbe: library tests on an Ivy Bridge" "movbe: all good" \
+			"$(qemu-x86_64 -cpu IvyBridge "$TMP/movbe_test" 2>&1 | grep -v 'uncaught target signal')"
+	else
+		echo "skip movbe: library tests on an Ivy Bridge (this C library needs a newer CPU)"
+	fi
 else
 	echo "skip movbe: library tests (need cc and qemu-user)"
 fi
