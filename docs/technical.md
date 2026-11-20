@@ -133,6 +133,9 @@ shows "Update available" at the top until it's installed.
 2. Tag the commit `v<version>` and push the tag.
 3. On GitHub, create a release from that tag, attach both files and publish.
    Leave it as a normal release: TVs ignore pre-releases.
+4. When there's a new ISO, upload it to Google Drive (it's too big for
+   GitHub), share it with anyone who has the link, point the README's
+   download link to it and put its SHA-256 in the release notes.
 
 `UPDATE_REPO` in `config.env` names the repository (empty turns updates off).
 
@@ -258,8 +261,8 @@ balenaEtcher or `dd`, or copy it to a Ventoy stick.
 
 A few things worth knowing:
 
-- `tools/build-ours.sh <dir>` builds just our two programs (`otto-remote`
-  and the TV app). `OTTO_PREBUILT=<dir> ./build.sh` uses them, for a machine
+- `tools/build-ours.sh <dir>` builds just our own programs (`otto-remote`,
+  the TV app and `libotto_movbe.so`). `OTTO_PREBUILT=<dir> ./build.sh` uses them, for a machine
   without Go or the Android SDK.
 - `OTTO_UPDATE_ONLY=1 ./build.sh` stops after the update archive, which skips
   the slow ISO step.
@@ -324,8 +327,6 @@ to `/data/misc/otto/remote.log`.
 ## Known gaps
 
 - **Only one machine so far:** the Acer in [docs/hardware](hardware/).
-- **No ISO to download:** it's bigger than the 2 GB GitHub allows per release
-  file. CI builds land as short-lived workflow artifacts for now.
 - **Plain HTTP for the phone remote:** traffic stays on the home network, but
   someone already on that Wi-Fi could read the token.
 - **Typing from the phone** goes through a US layout, so Portuguese accents

@@ -74,9 +74,12 @@ This isn't Android TV with a new wallpaper. Some of what went into it:
 
 ### How to try it
 
-There's no ISO to download yet: it's bigger than the 2 GB GitHub allows per
-file, and I'm still figuring out where to host it. For now you build it
-yourself ([how](docs/technical.md#build)). Then:
+Download the ISO from [Google Drive](https://drive.google.com/file/d/1aCdLakNSqOuaPvUmTtjlDD6mi7I2ikdl/view). It's bigger than the 2 GB
+GitHub allows per file, so it lives there. Drive warns it can't scan a file
+this big for viruses: that's normal, download it anyway. Each
+[release](https://github.com/gmoreno-dev/OttoTV/releases) here lists the
+ISO's SHA-256 so you can check the download. You can also build it yourself
+([how](docs/technical.md#build)). Then:
 
 1. Write the ISO to a USB stick (Rufus, balenaEtcher or Ventoy).
 2. Plug the computer into the TV and boot from the stick.
@@ -85,9 +88,11 @@ yourself ([how](docs/technical.md#build)). Then:
 
 ### Status
 
-Still early. So far it has only run on one machine: my Acer, hooked up to a
-Samsung TV. If you try it on yours, open an issue and tell me how it went,
-especially if something breaks.
+Done, for now: it does what I wanted, and my old TV got a second life. It
+has only run on one machine, my Acer hooked up to a Samsung TV, so other
+PCs are uncharted. If you try it on yours, open an issue and tell me how it
+went, especially if something breaks. I fix bugs when I can, and installed
+TVs get the fixes on their own.
 
 ### More details
 
@@ -173,9 +178,12 @@ Não é um Android TV com papel de parede novo. Um pouco do que foi feito:
 
 ### Como testar
 
-Ainda não tem ISO pra baixar: ela passa dos 2 GB que o GitHub aceita por
-arquivo, e eu ainda tô vendo onde hospedar. Por enquanto você mesmo gera a
-sua ([como](docs/technical.md#build)). Depois:
+Baixa a ISO no [Google Drive](https://drive.google.com/file/d/1aCdLakNSqOuaPvUmTtjlDD6mi7I2ikdl/view). Ela passa dos 2 GB que o GitHub aceita
+por arquivo, então fica lá. O Drive avisa que não consegue verificar vírus
+num arquivo desse tamanho: é normal, baixa mesmo assim. Cada
+[release](https://github.com/gmoreno-dev/OttoTV/releases) daqui mostra o
+SHA-256 da ISO, pra você conferir o download. Também dá pra gerar a sua
+([como](docs/technical.md#build)). Depois:
 
 1. Grava a ISO num pendrive (Rufus, balenaEtcher ou Ventoy).
 2. Liga o computador na TV e dá boot pelo pendrive.
@@ -184,9 +192,11 @@ sua ([como](docs/technical.md#build)). Depois:
 
 ### Status
 
-Ainda no começo. Até agora só rodou numa máquina: o meu Acer, ligado numa TV
-Samsung. Se você testar no seu, abre uma issue e me conta como foi,
-principalmente se algo quebrar.
+Pronto, por enquanto: ele faz o que eu queria, e minha TV velha ganhou uma
+segunda vida. Até agora só rodou numa máquina, o meu Acer ligado numa TV
+Samsung, então outros PCs são território desconhecido. Se você testar no
+seu, abre uma issue e me conta como foi, principalmente se algo quebrar. Eu
+corrijo bug quando dá, e as TVs instaladas recebem as correções sozinhas.
 
 ### Mais detalhes
 
