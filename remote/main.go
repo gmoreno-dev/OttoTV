@@ -22,6 +22,7 @@ import (
 	"syscall"
 	"time"
 
+	"otto/remote/adblock"
 	"otto/remote/hotkeys"
 	"otto/remote/mdns"
 	"otto/remote/panel"
@@ -195,6 +196,15 @@ func main() {
 		go laptop.Watch(ctx, 10*time.Second)
 	}
 	srv.Audio = func() string { return sys.Audio(srv.Laptop != nil) }
+
+	// Ad blocking (Private DNS), on unless turned off in the quick panel.
+	ads := &adblock.DNS{
+		Choice: filepath.Join(*state, "adblock"),
+		Paused: func() { srv.Notify("adblock_paused", "") },
+		Log:    log.New(os.Stderr, "otto-remote: adblock: ", log.LstdFlags|log.Lmsgprefix),
+	}
+	srv.AdBlock = ads
+	go ads.Watch(ctx, 30*time.Second)
 
 	// Shortcuts carried out with Android's tools: from the keyboard (below)
 	// and the phone's Panel button.

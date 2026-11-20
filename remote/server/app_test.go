@@ -41,6 +41,22 @@ func (f *fakeSystem) Details() map[string]any {
 	return map[string]any{"cpuTemp": 58.0, "graphics": "hardware", "adb": 5555}
 }
 
+type fakeAdBlock struct {
+	state string
+	err   error
+	sets  []bool
+}
+
+func (f *fakeAdBlock) State() string { return f.state }
+func (f *fakeAdBlock) Set(on bool) error {
+	f.sets = append(f.sets, on)
+	if f.err != nil {
+		return f.err
+	}
+	f.state = map[bool]string{true: "on", false: "off"}[on]
+	return nil
+}
+
 func appServer(t *testing.T) (*Server, *fakeSystem, *fakeLaptop) {
 	s, _ := newTestServer(t)
 	sys := &fakeSystem{power: make(chan string, 1)}
@@ -107,6 +123,46 @@ func TestAppStatus(t *testing.T) {
 	m = decode(t, get(h, "127.0.0.1:5000", "127.0.0.1:8686", "/app/status?wifi=1"))
 	if m["ssid"] != "Sala 5G" {
 		t.Errorf("ssid: %v", m)
+	}
+	if _, ok := m["adblock"]; ok {
+		t.Error("adblock without ad blocking")
+	}
+	s.AdBlock = &fakeAdBlock{state: "paused"}
+	m = decode(t, get(s.Handler(), "127.0.0.1:5000", "127.0.0.1:8686", "/app/status?wifi=1"))
+	if m["adblock"] != "paused" {
+		t.Errorf("adblock: %v", m)
+	}
+	m = decode(t, get(s.Handler(), "127.0.0.1:5000", "127.0.0.1:8686", "/app/status"))
+	if _, ok := m["adblock"]; ok {
+		t.Error("adblock without the panel asking")
+	}
+}
+
+func TestAppAdBlock(t *testing.T) {
+	s, _, _ := appServer(t)
+	if w := post(s.Handler(), "/app/adblock", `{"on":true}`); w.Code != http.StatusServiceUnavailable {
+		t.Errorf("without ad blocking: %d", w.Code)
+	}
+	ab := &fakeAdBlock{state: "on"}
+	s.AdBlock = ab
+	h := s.Handler()
+	w := post(h, "/app/adblock", `{"on":false}`)
+	if m := decode(t, w); w.Code != http.StatusOK || m["adblock"] != "off" {
+		t.Errorf("off: %d %v", w.Code, m)
+	}
+	if w := post(h, "/app/adblock", `{"on":"yes"}`); w.Code != http.StatusBadRequest {
+		t.Errorf("bad body: %d", w.Code)
+	}
+	ab.err = errors.New("settings: no service")
+	if w := post(h, "/app/adblock", `{"on":true}`); w.Code != http.StatusInternalServerError {
+		t.Errorf("failure: %d", w.Code)
+	}
+	if len(ab.sets) != 2 || ab.sets[0] || !ab.sets[1] {
+		t.Errorf("sets: %v", ab.sets)
+	}
+	s.Peers = fakePeers{allow: false}
+	if w := post(s.Handler(), "/app/adblock", `{"on":false}`); w.Code != http.StatusForbidden {
+		t.Errorf("from another app: %d", w.Code)
 	}
 }
 

@@ -37,6 +37,9 @@ final class Icons {
     static final String POWER = "M12 3v8 M6.3 6.8a8 8 0 1 0 11.4 0";
     static final String LAPTOP = "M4 5h16v11H4z M2 19.5h20";
     static final String LAPTOP_OFF = LAPTOP + " M3 3l18 18";
+    static final String SHIELD = "M12 3l7.5 3v5.5c0 4.6-3.2 8.2-7.5 9.5c-4.3-1.3-7.5-4.9-7.5-9.5V6z";
+    static final String SHIELD_ON = SHIELD + " M8.8 12l2.2 2.2 4.2-4.4";
+    static final String SHIELD_OFF = SHIELD + " M3 3l18 18";
     static final String CLOSE_APP = "M4 4h16v16H4z M9 9l6 6 M15 9l-6 6";
     static final String BLUETOOTH = "M7 7l10 10-5 4V3l5 4L7 17";
     static final String BAG = "M5.5 8h13l-1.2 12.5H6.7z M9 8V6.5a3 3 0 0 1 6 0V8";

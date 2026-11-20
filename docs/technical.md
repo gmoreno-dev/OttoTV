@@ -57,7 +57,7 @@ for them.
 |---|---|
 | `iso/scripts/9-otto` | The initrd hook (shell), before Android starts |
 | `iso/otto/` | What Android uses: `init-hooks.sh`, boot animations, the installer's pieces |
-| `remote/` | `otto-remote` (Go, runs as root): phone remote, `otto-tv.local`, updates, boot read-ahead |
+| `remote/` | `otto-remote` (Go, runs as root): phone remote, `otto-tv.local`, updates, ad blocking, boot read-ahead |
 | `tvapp/` | The TV app (Java): home screen, quick panel, "Connect phone", keyboard |
 | `tools/` | Build scripts, and `tools/device/` with scripts that run on a TV over ADB |
 | `tests/` | `tests/run.sh` runs everything |
@@ -139,6 +139,30 @@ shows "Update available" at the top until it's installed.
 **Keep backups of the keys.** Without `cache/otto-update.key`, TVs can't take
 new releases. Without `cache/otto.keystore` and its `.pass`, the app can't be
 updated (Android only installs an update signed with the same key).
+
+## Ad blocking
+
+The quick panel's "Block ads" switch, on unless someone turns it off, uses
+Android's Private DNS: every app's name lookups go encrypted (DNS over TLS)
+to [AdGuard DNS](https://adguard-dns.io), whose default list answers the
+names of ad and tracker servers with nothing. It works the same in apps and
+websites, with nothing to install. It can't block ads that come from the
+same servers as the video itself (YouTube's).
+
+`otto-remote` (`remote/adblock`) turns it on the first time it runs, unless
+the TV already uses a Private DNS server of its own. After that the switch
+decides, and Android keeps the setting: while it's on,
+`settings get global private_dns_mode` says `hostname` and
+`private_dns_specifier` says `dns.adguard-dns.com`.
+
+With a Private DNS server set, Android has no fallback: on a network that
+blocks DNS over TLS (port 853), no name resolves and the TV looks offline.
+So while it's on, `otto-remote` asks Android every 30 seconds whether
+Private DNS is broken (`dumpsys connectivity networks`). When Android says
+so three checks in a row, and the internet answers anyway (a connection to
+1.1.1.1, 8.8.8.8 or 9.9.9.9, no names involved), it turns ad blocking off
+and the TV shows a notice. The panel shows it as paused until someone turns
+it back on.
 
 ## Making an old laptop feel fast
 
@@ -318,6 +342,9 @@ to `/data/misc/otto/remote.log`.
   F-Droid's signed index is on the list.
 - **Streaming apps:** Widevine is L3 (lower quality), there are no Google
   Play services, and Max stays on its logo for reasons still unknown.
+  Globoplay's picture only shows on the laptop screen: Android 14 counts
+  only built-in screens as secure (HDMI's HDCP isn't checked), and draws
+  windows marked secure in black anywhere else.
 - **Old Intel Macs** that only boot from HFS+ won't boot (the build has to
   drop that copy of the boot files).
 

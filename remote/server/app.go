@@ -28,6 +28,14 @@ type System interface {
 	Details() map[string]any
 }
 
+// AdBlock blocks ads on the whole TV (the adblock package).
+type AdBlock interface {
+	// State is "on", "off" or "paused" (turned off because the network
+	// blocks it); "" when it can't be told.
+	State() string
+	Set(on bool) error
+}
+
 // ErrNoTVSound: the TV's sound output isn't known (no TV was found on HDMI).
 var ErrNoTVSound = errors.New("no TV sound output found")
 
@@ -37,6 +45,7 @@ func (s *Server) appRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /app/audio", s.onlyFromApp(s.handleAppAudio))
 	mux.HandleFunc("POST /app/screen", s.onlyFromApp(s.handleAppScreen))
 	mux.HandleFunc("POST /app/power", s.onlyFromApp(s.handleAppPower))
+	mux.HandleFunc("POST /app/adblock", s.onlyFromApp(s.handleAppAdBlock))
 	mux.HandleFunc("GET /app/details", s.onlyFromApp(s.handleAppDetails))
 	mux.HandleFunc("GET /app/pair", s.onlyFromApp(s.handleAppPair))
 	mux.HandleFunc("GET /app/update", s.onlyFromApp(s.handleAppUpdate))
@@ -74,10 +83,13 @@ func (s *Server) appStatus(wifi bool) map[string]any {
 		"audio":  s.audio(),
 		"laptop": s.laptopState(),
 	}
-	// Asking Android for the network's name takes a moment: only the
-	// quick panel wants it.
+	// Asking Android for the network's name (and ad blocking's state)
+	// takes a moment: only the quick panel wants them.
 	if wifi && s.System != nil {
 		st["ssid"] = s.System.SSID()
+	}
+	if wifi && s.AdBlock != nil {
+		st["adblock"] = s.AdBlock.State()
 	}
 	return st
 }
@@ -140,6 +152,25 @@ func (s *Server) handleAppScreen(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"laptop": s.laptopState()})
+}
+
+func (s *Server) handleAppAdBlock(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		On bool `json:"on"`
+	}
+	if !readBody(w, r, &req) {
+		return
+	}
+	if s.AdBlock == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "unavailable"})
+		return
+	}
+	if err := s.AdBlock.Set(req.On); err != nil {
+		log.Printf("ad blocking on=%v: %v", req.On, err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"adblock": s.AdBlock.State()})
 }
 
 // powerDelay lets the answer reach the app before the TV goes dark.

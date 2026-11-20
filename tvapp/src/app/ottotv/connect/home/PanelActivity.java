@@ -35,13 +35,13 @@ import app.ottotv.connect.R;
 /**
  * The quick panel (F2, over any app; Alt+F4 on the home screen and
  * Ctrl+Alt+Del open it on Power): where the sound goes and the laptop's own
- * screen (on laptops), Wi-Fi, connecting a phone, suspend, restart and turn
- * off, a new version when there is one (Updates), and the system's
- * details. It never scrolls: 824 px tall on a laptop, 540 on a desktop, 80
- * more with an update.
+ * screen (on laptops), Wi-Fi, connecting a phone, ad blocking, suspend,
+ * restart and turn off, a new version when there is one (Updates), and the
+ * system's details. It never scrolls: 944 px tall on a laptop, 660 on a
+ * desktop, 80 more with an update.
  *
  * otto-remote does what an app may not (switch the sound, the laptop
- * screen, restart): see Remote.
+ * screen, ad blocking, restart): see Remote.
  */
 public class PanelActivity extends Activity {
     static final String EXTRA_FOCUS = "focus";
@@ -71,6 +71,7 @@ public class PanelActivity extends Activity {
     private PanelItem screen;
     private PanelItem wifi;
     private PanelItem phone;
+    private PanelItem ads;
     private PanelItem power;
     private PanelItem update;
     private PanelItem more;
@@ -170,12 +171,15 @@ public class PanelActivity extends Activity {
         stage.removeAllViews();
         items.clear();
         float h = panelHeight(laptop) + (Updates.state != Updates.NONE ? PanelItem.height(PanelItem.UPDATE) + 16 : 0);
+        // On a laptop with an update the panel is almost as tall as the
+        // screen: then it moves up rather than past the bottom.
+        float top = Math.min(TOP, Ui.H - 24 - h);
 
         box = new Box(this, ui);
         box.setClipChildren(false);
         box.setAlpha(0);
         box.setTranslationX(ui.f(48));
-        place(stage, box, LEFT, TOP, WIDTH, h);
+        place(stage, box, LEFT, top, WIDTH, h);
         // Clicks inside the panel don't close it.
         box.setOnClickListener(v -> { });
 
@@ -201,6 +205,8 @@ public class PanelActivity extends Activity {
         wifi = item(PanelItem.WIFI, 32, y, half);
         phone = item(PanelItem.PHONE, 32 + half + 16, y, half);
         y += PanelItem.height(PanelItem.WIFI) + 16;
+        ads = item(PanelItem.ADBLOCK, 32, y, inner);
+        y += PanelItem.height(PanelItem.ADBLOCK) + 16;
         power = item(PanelItem.POWER, 32, y, inner);
         y += PanelItem.height(PanelItem.POWER) + 16;
         update = null;
@@ -213,7 +219,7 @@ public class PanelActivity extends Activity {
         details = new DetailsCard(this, ui);
         details.setAlpha(0);
         details.setTranslationX(ui.f(32));
-        place(stage, details, 464, TOP + h - DetailsCard.HEIGHT, DetailsCard.WIDTH, DetailsCard.HEIGHT);
+        place(stage, details, 464, top + h - DetailsCard.HEIGHT, DetailsCard.WIDTH, DetailsCard.HEIGHT);
 
         toast = new ToastView(this, ui);
         place(stage, toast, 250, 130, ToastView.WIDTH, -2);
@@ -232,7 +238,7 @@ public class PanelActivity extends Activity {
     }
 
     static float panelHeight(boolean laptop) {
-        return 56 + 80 + (laptop ? 284 : 0) + 184 + 140 + 80;
+        return 56 + 80 + (laptop ? 284 : 0) + 184 + 120 + 140 + 80;
     }
 
     private PanelItem item(int kind, float x, float y, float w) {
@@ -302,6 +308,13 @@ public class PanelActivity extends Activity {
         phone.titleText = getString(connected ? R.string.panel_phone_connected : R.string.home_connect_phone);
         phone.subText = getString(connected ? R.string.panel_phone_another : R.string.panel_phone_none);
         phone.update(animate);
+        ads.titleText = getString(R.string.panel_adblock);
+        ads.on = "on".equals(s.adblock);
+        boolean paused = "paused".equals(s.adblock);
+        ads.subText = getString(paused ? R.string.panel_adblock_paused : R.string.panel_adblock_note);
+        ads.stateText = getString(ads.on ? R.string.panel_adblock_on
+                : paused ? R.string.panel_adblock_paused_state : R.string.panel_adblock_off);
+        ads.update(animate);
         power.titleText = getString(R.string.panel_power);
         power.options = new String[] {getString(R.string.panel_suspend), getString(R.string.panel_restart),
                 getString(R.string.panel_turn_off)};
@@ -395,13 +408,17 @@ public class PanelActivity extends Activity {
         if (isDestroyed() || j == null) {
             return;
         }
-        if (!j.has("ssid") && status != null && !status.ssid.isEmpty()) {
-            // Answers to the panel's actions leave the network's name out.
-            try {
+        // Answers to the panel's actions leave the network's name and ad
+        // blocking out: keep what the panel knew.
+        try {
+            if (!j.has("ssid") && status != null && !status.ssid.isEmpty()) {
                 j.put("ssid", status.ssid);
-            } catch (org.json.JSONException e) {
-                // shown without it
             }
+            if (!j.has("adblock") && status != null && !status.adblock.isEmpty()) {
+                j.put("adblock", status.adblock);
+            }
+        } catch (org.json.JSONException e) {
+            // shown without them
         }
         status = new Remote.Status(j);
         Remote.last = status;
@@ -454,6 +471,7 @@ public class PanelActivity extends Activity {
         pair.add(wifi);
         pair.add(phone);
         rows.add(pair);
+        rows.add(one(ads));
         rows.add(one(power));
         if (update != null) {
             rows.add(one(update));
@@ -569,6 +587,9 @@ public class PanelActivity extends Activity {
             case PanelItem.SCREEN:
                 setScreen(!it.on);
                 break;
+            case PanelItem.ADBLOCK:
+                setAdBlock(!it.on);
+                break;
             case PanelItem.WIFI:
                 Intent w = new Intent(Settings.ACTION_WIFI_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 if (startSafely(w)) {
@@ -600,7 +621,7 @@ public class PanelActivity extends Activity {
             return;
         }
         // Show it at once; the switch itself takes a second.
-        status = withAudio(to);
+        status = (status != null ? status : new Remote.Status(null)).with("audio", to);
         refresh(true);
         Remote.post("/app/audio", Remote.body("to", to), (j) -> {
             if (j == null) {
@@ -612,18 +633,6 @@ public class PanelActivity extends Activity {
         });
     }
 
-    private Remote.Status withAudio(String audio) {
-        JSONObject j = new JSONObject();
-        try {
-            Remote.Status s = status != null ? status : new Remote.Status(null);
-            j.put("phones", s.phones).put("paired", s.paired).put("audio", audio).put("laptop", s.laptop)
-                    .put("ssid", s.ssid);
-        } catch (org.json.JSONException e) {
-            return status;
-        }
-        return new Remote.Status(j);
-    }
-
     private void setScreen(boolean on) {
         Remote.post("/app/screen", Remote.body("on", on), (j) -> {
             if (j == null) {
@@ -632,13 +641,7 @@ public class PanelActivity extends Activity {
             }
             String state = j.optString("laptop");
             if (status != null) {
-                try {
-                    JSONObject s = new JSONObject().put("phones", status.phones).put("paired", status.paired)
-                            .put("audio", status.audio).put("laptop", state).put("ssid", status.ssid);
-                    status = new Remote.Status(s);
-                } catch (org.json.JSONException e) {
-                    // keep the old one
-                }
+                status = status.with("laptop", state);
             }
             refresh(true);
             // The state is the user's choice: otto-remote keeps the screen lit
@@ -649,6 +652,38 @@ public class PanelActivity extends Activity {
                 showToast(Icons.LAPTOP, getString(R.string.toast_screen_on), null);
             }
         });
+    }
+
+    private void setAdBlock(boolean on) {
+        // Show it at once, like the sound.
+        Remote.Status before = status != null ? status : new Remote.Status(null);
+        status = before.with("adblock", on ? "on" : "off");
+        refresh(true);
+        Remote.post("/app/adblock", Remote.body("on", on), (j) -> {
+            if (isDestroyed()) {
+                return;
+            }
+            if (j == null) {
+                status = status.with("adblock", before.adblock);
+                refresh(true);
+                showToast(Icons.SHIELD, getString(R.string.panel_adblock_failed), null);
+                Remote.get(STATUS, this::onStatus);
+                return;
+            }
+            String state = j.optString("adblock");
+            status = status.with("adblock", state);
+            refresh(true);
+            if ("on".equals(state)) {
+                showToast(Icons.SHIELD_ON, getString(R.string.toast_adblock_on), getString(R.string.toast_adblock_on_sub));
+            } else {
+                showToast(Icons.SHIELD_OFF, getString(R.string.toast_adblock_off), null);
+            }
+        });
+    }
+
+    /** otto-remote changed something the panel shows (ad blocking paused). */
+    void reload() {
+        Remote.get(STATUS, this::onStatus);
     }
 
     private void powerAction(int which) {

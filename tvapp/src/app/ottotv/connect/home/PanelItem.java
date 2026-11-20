@@ -12,8 +12,9 @@ import android.view.View;
 
 /**
  * One item of the quick panel: sound output, laptop screen, Wi-Fi, phone,
- * power, an update (only when there is one) or "Show details". Each draws itself like the design's panel: a
- * rounded tile, lighter when focused, grown 1.04 with the amber ring.
+ * ad blocking, power, an update (only when there is one) or "Show
+ * details". Each draws itself like the design's panel: a rounded tile,
+ * lighter when focused, grown 1.04 with the amber ring.
  */
 final class PanelItem extends View {
     static final int SOUND = 0;
@@ -23,6 +24,7 @@ final class PanelItem extends View {
     static final int POWER = 4;
     static final int DETAILS = 5;
     static final int UPDATE = 6;
+    static final int ADBLOCK = 7;
 
     private final Ui ui;
     final int kind;
@@ -75,6 +77,8 @@ final class PanelItem extends View {
                 return 124;
             case SCREEN:
                 return 128;
+            case ADBLOCK:
+                return 104;
             case WIFI:
             case PHONE:
                 return 168;
@@ -153,7 +157,10 @@ final class PanelItem extends View {
                 drawChoice(c, w, h);
                 break;
             case SCREEN:
-                drawScreen(c, w, h);
+                drawSwitch(c, w, h, Icons.LAPTOP, 2);
+                break;
+            case ADBLOCK:
+                drawSwitch(c, w, h, on ? Icons.SHIELD_ON : Icons.SHIELD, 1);
                 break;
             case WIFI:
             case PHONE:
@@ -217,15 +224,18 @@ final class PanelItem extends View {
         }
     }
 
-    /** Laptop screen: icon, title and a two-line note, the state and a switch. */
-    private void drawScreen(Canvas c, float w, float h) {
+    /**
+     * Laptop screen or ad blocking: icon, title and a note (up to lines
+     * lines), the state and a switch.
+     */
+    private void drawSwitch(Canvas c, float w, float h, String icon, int lines) {
         float x = ui.f(20);
         float circle = ui.f(48);
         Paint pt = Draw.paint();
         pt.setColor(Ui.alpha(0xFFFFFF, 0.08f));
         c.drawCircle(x + circle / 2, h / 2, circle / 2, pt);
         float is = ui.f(26);
-        Icons.draw(c, Icons.LAPTOP, x + (circle - is) / 2, h / 2 - is / 2, is, 2.2f, Ui.TEXT, false);
+        Icons.draw(c, icon, x + (circle - is) / 2, h / 2 - is / 2, is, 2.2f, Ui.TEXT, false);
 
         // Right side: "On"/"Off" and the switch.
         float sw = ui.f(64), sh = ui.f(36);
@@ -244,11 +254,13 @@ final class PanelItem extends View {
         float tx = x + circle + ui.f(16);
         float maxW = p.left - ui.f(12) - stateW - ui.f(16) - tx;
         if (subLayout == null) {
-            subLayout = StaticLayout.Builder.obtain(subText, 0, subText.length(), sub, (int) Math.max(1, maxW))
+            // One line is cut short with "…" rather than wrapped.
+            String text = lines == 1 ? Draw.fit(subText, sub, maxW) : subText;
+            subLayout = StaticLayout.Builder.obtain(text, 0, text.length(), sub, (int) Math.max(1, maxW))
                     .setAlignment(Layout.Alignment.ALIGN_NORMAL)
                     .setLineSpacing(ui.f(24 * 1.3f) - (sub.getFontMetrics().descent - sub.getFontMetrics().ascent), 1)
                     .setIncludePad(false)
-                    .setMaxLines(2)
+                    .setMaxLines(lines)
                     .build();
         }
         float tl = ui.f(26 * 1.25f), sl = ui.f(24 * 1.3f) * subLayout.getLineCount();

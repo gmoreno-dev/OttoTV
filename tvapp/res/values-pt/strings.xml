@@ -52,6 +52,13 @@
     <string name="panel_screen_on">Acesa</string>
     <string name="panel_screen_off">Apagada</string>
     <string name="panel_screen_failed">Não deu para mudar a tela do notebook</string>
+    <string name="panel_adblock">Bloquear anúncios</string>
+    <string name="panel_adblock_note">Em apps e sites</string>
+    <string name="panel_adblock_paused">Esta rede não deixa</string>
+    <string name="panel_adblock_on">Ligado</string>
+    <string name="panel_adblock_off">Desligado</string>
+    <string name="panel_adblock_paused_state">Pausado</string>
+    <string name="panel_adblock_failed">Não deu para mudar o bloqueio de anúncios</string>
     <string name="panel_wifi">Wi-Fi</string>
     <string name="panel_network">Rede</string>
     <string name="panel_cable">Cabo de rede</string>
@@ -93,6 +100,11 @@
     <string name="toast_screen_off">Tela do notebook apagada</string>
     <string name="toast_screen_off_sub">A imagem continua na TV</string>
     <string name="toast_screen_on">Tela do notebook acesa</string>
+    <string name="toast_adblock_on">Bloqueando anúncios</string>
+    <string name="toast_adblock_on_sub">Em apps e sites</string>
+    <string name="toast_adblock_off">Bloqueio de anúncios desligado</string>
+    <string name="toast_adblock_paused">Bloqueio de anúncios pausado</string>
+    <string name="toast_adblock_paused_sub">Esta rede não deixa ele funcionar</string>
     <string name="toast_closed">App fechado</string>
     <!-- Shortcuts (home/ShortcutsActivity). -->
     <string name="shortcuts_title">Atalhos</string>

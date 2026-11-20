@@ -22,6 +22,7 @@ import app.ottotv.connect.R;
  *   screen_off   the laptop screen went dark (phone remote or Fn key)
  *   screen_on    and lit again
  *   closed       Alt+F4 closed an app (--es app <package>)
+ *   adblock_paused  ad blocking turned itself off: this network blocks it
  * Only senders allowed to change secure settings get in (root, the shell).
  *
  * In the quick panel or on the home screen the notice joins them; over
@@ -56,6 +57,14 @@ public class ToastReceiver extends BroadcastReceiver {
             case "screen_on":
                 icon = Icons.LAPTOP;
                 title = context.getString(R.string.toast_screen_on);
+                break;
+            case "adblock_paused":
+                icon = Icons.SHIELD_OFF;
+                title = context.getString(R.string.toast_adblock_paused);
+                sub = context.getString(R.string.toast_adblock_paused_sub);
+                if (PanelActivity.shown != null) {
+                    PanelActivity.shown.reload();
+                }
                 break;
             case "closed":
                 icon = Icons.CLOSE_APP;

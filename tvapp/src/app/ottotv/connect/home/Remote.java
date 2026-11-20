@@ -53,14 +53,29 @@ final class Remote {
         /** "on", "off" or "" (no laptop screen). */
         final String laptop;
         final String ssid;
+        /** Ad blocking: "on", "off", "paused" (the network blocks it) or "" (not known yet). */
+        final String adblock;
+        private final JSONObject json;
 
         Status(JSONObject j) {
+            json = j;
             reachable = j != null;
             phones = j == null ? 0 : j.optInt("phones");
             paired = j != null && j.optBoolean("paired");
             audio = j == null ? "" : j.optString("audio");
             laptop = j == null ? "" : j.optString("laptop");
             ssid = j == null ? "" : j.optString("ssid");
+            adblock = j == null ? "" : j.optString("adblock");
+        }
+
+        /** This status with one value changed. */
+        Status with(String key, Object value) {
+            try {
+                JSONObject j = json == null ? new JSONObject() : new JSONObject(json.toString());
+                return new Status(j.put(key, value));
+            } catch (org.json.JSONException e) {
+                return this;
+            }
         }
     }
 

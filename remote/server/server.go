@@ -41,6 +41,7 @@ type Server struct {
 	Audio   func() string      // where the sound goes: "tv", "notebook" or ""; may be nil
 	Peers   PeerCheck          // who may use /app/ (the launcher); nil: nobody
 	System  System             // what /app/ can change; may be nil
+	AdBlock AdBlock            // the quick panel's ad blocking switch; may be nil
 	// Notify shows a notice on the TV over any app (tvapp's ToastReceiver):
 	// "phone", "screen_off", "screen_on" or "closed" (with the app's
 	// package). May be nil.

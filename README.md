@@ -28,10 +28,13 @@ lot more.
   touchpad.
 - **Use the laptop's keyboard and mouse** if you'd rather. The shortcuts
   make sense on a TV: Esc goes back, F2 opens the quick panel.
+- **See fewer ads.** A switch in the quick panel, on from the start, blocks
+  ads in apps and websites. YouTube's still get through.
 
-Netflix, Prime Video and the like are a different story: they only offer
-their apps to devices certified by Google, so they don't show up in Aurora.
-I'm working on it.
+Streaming apps are hit and miss. Disney+, Crunchyroll, Twitch and Globoplay
+work (Globoplay's picture only shows on the laptop screen for now). Netflix,
+Prime Video, Max and Apple TV don't: Netflix refuses devices Google hasn't
+certified, and I'm still looking into the others.
 
 ### What's actually in here
 
@@ -53,6 +56,10 @@ This isn't Android TV with a new wallpaper. Some of what went into it:
   output with a TV plugged in. Nothing to set up.
 - **It updates itself** from this repository's releases. Updates are signed,
   so the TV only installs what I published.
+- **Protected video on old CPUs.** Apps with protected video made Android's
+  DRM crash on processors from before 2013, which lack one instruction
+  (MOVBE). A tiny library now does that instruction in software, only on
+  those CPUs. That's what got Disney+ playing.
 - **Its own installer, boot menu and boot animation**, with Otto the octopus.
 - **Tested.** Over 250 automated tests run on every change, and everything
   above was measured on the real thing.
@@ -118,10 +125,13 @@ notebook. O Otto TV começou comigo arrumando isso, e virou bem mais que isso.
   touchpad.
 - **Usar o teclado e o mouse do notebook**, se preferir. Os atalhos fazem
   sentido numa TV: Esc volta, F2 abre o painel rápido.
+- **Ver menos anúncios.** Um botão no painel rápido, que já vem ligado,
+  bloqueia anúncios em apps e sites. Os do YouTube ainda passam.
 
-Netflix, Prime Video e parecidos são outra história: eles só liberam os apps
-pra aparelhos certificados pelo Google, então não aparecem na Aurora. Tô
-trabalhando nisso.
+Apps de streaming: uns funcionam, outros não. Disney+, Crunchyroll, Twitch e
+Globoplay funcionam (por enquanto a imagem do Globoplay só aparece na tela do
+notebook). Netflix, Prime Video, Max e Apple TV não: a Netflix recusa
+aparelhos que o Google não certificou, e os outros eu ainda tô investigando.
 
 ### O que tem de verdade aqui dentro
 
@@ -143,6 +153,11 @@ Não é um Android TV com papel de parede novo. Um pouco do que foi feito:
   que tem uma TV ligada. Nada pra configurar.
 - **Ele se atualiza sozinho** pelas releases deste repositório. As
   atualizações são assinadas, então a TV só instala o que eu publiquei.
+- **Vídeo protegido em processador antigo.** Apps com vídeo protegido
+  derrubavam o DRM do Android em processadores de antes de 2013, que não têm
+  uma instrução (MOVBE). Uma biblioteca pequenininha agora faz essa
+  instrução por software, só nesses processadores. Foi isso que fez o Disney+
+  rodar.
 - **Instalador, menu de boot e animação de inicialização próprios**, com o
   Otto, o polvo.
 - **Testado.** Mais de 250 testes automáticos rodam a cada mudança, e tudo aí

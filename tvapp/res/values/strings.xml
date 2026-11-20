@@ -52,6 +52,13 @@
     <string name="panel_screen_on">On</string>
     <string name="panel_screen_off">Off</string>
     <string name="panel_screen_failed">Couldn\'t change the laptop screen</string>
+    <string name="panel_adblock">Block ads</string>
+    <string name="panel_adblock_note">In apps and websites</string>
+    <string name="panel_adblock_paused">This network blocks it</string>
+    <string name="panel_adblock_on">On</string>
+    <string name="panel_adblock_off">Off</string>
+    <string name="panel_adblock_paused_state">Paused</string>
+    <string name="panel_adblock_failed">Couldn\'t change ad blocking</string>
     <string name="panel_wifi">Wi-Fi</string>
     <string name="panel_network">Network</string>
     <string name="panel_cable">Network cable</string>
@@ -93,6 +100,11 @@
     <string name="toast_screen_off">Laptop screen off</string>
     <string name="toast_screen_off_sub">The picture stays on the TV</string>
     <string name="toast_screen_on">Laptop screen on</string>
+    <string name="toast_adblock_on">Blocking ads</string>
+    <string name="toast_adblock_on_sub">In apps and websites</string>
+    <string name="toast_adblock_off">Ad blocking off</string>
+    <string name="toast_adblock_paused">Ad blocking paused</string>
+    <string name="toast_adblock_paused_sub">This network doesn\'t let it work</string>
     <string name="toast_closed">App closed</string>
     <!-- Shortcuts (home/ShortcutsActivity). -->
     <string name="shortcuts_title">Shortcuts</string>
