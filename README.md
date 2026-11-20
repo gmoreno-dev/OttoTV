@@ -1,8 +1,4 @@
 <p align="center">
-  <img src="docs/images/hero.jpg" alt="Otto TV: an old laptop turned into a smart TV" width="100%">
-</p>
-
-<p align="center">
   <a href="https://github.com/gmoreno-dev/OttoTV/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/gmoreno-dev/OttoTV?label=release&color=F2B25C"></a>
   <a href="https://github.com/gmoreno-dev/OttoTV/actions/workflows/ci.yml"><img alt="Tests" src="https://github.com/gmoreno-dev/OttoTV/actions/workflows/ci.yml/badge.svg"></a>
 </p>
