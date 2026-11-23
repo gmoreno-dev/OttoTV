@@ -146,6 +146,14 @@ haven't pinned down yet, and Globoplay's picture only shows on the laptop
 screen. If you try it, open an issue and tell me how it went. I fix bugs
 when I can, and installed TVs get the fixes on their own.
 
+### How it was built
+
+I worked on Otto TV in a local repository before publishing it, so the
+history here starts shortly before 1.0.0. I used AI tools as an assistant
+along the way. The decisions, the measurements on the real hardware and the
+debugging are written up in [docs/technical.md](docs/technical.md) and
+[docs/hardware](docs/hardware).
+
 ### Credits
 
 Otto TV is built on [LineageOS TV x86](https://github.com/LineageOS-TV-x86),
@@ -302,6 +310,14 @@ certificou, Prime Video, Max e Apple TV falham por motivos que eu ainda não
 descobri, e a imagem do Globoplay só aparece na tela do notebook. Se você
 testar, abre uma issue e me conta como foi. Eu corrijo bug quando dá, e as
 TVs instaladas recebem as correções sozinhas.
+
+### Como foi feito
+
+Trabalhei no Otto TV num repositório local antes de publicar, então o
+histórico aqui começa pouco antes da 1.0.0. Usei ferramentas de IA como
+assistente no caminho. As decisões, as medições no aparelho de verdade e a
+depuração estão descritas em [docs/technical.md](docs/technical.md) e em
+[docs/hardware](docs/hardware) (em inglês).
 
 ### Créditos
 
