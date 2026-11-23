@@ -153,6 +153,12 @@ which builds on LineageOS, [Bliss OS](https://blissos.org) and Android-x86.
 I don't rebuild Android: I take their image and add my stuff on top. The
 bundled apps come from [F-Droid](https://f-droid.org).
 
+### License
+
+[MIT](LICENSE). The Inter font ([its license](art/fonts/LICENSE-Inter.txt))
+and the upstream files kept in `tests/fixtures` stay under their own
+licenses.
+
 ---
 
 ## Português
@@ -304,3 +310,9 @@ O Otto TV é feito em cima do
 do LineageOS, do [Bliss OS](https://blissos.org) e do Android-x86. Eu não
 recompilo o Android: pego a imagem deles e coloco as minhas coisas por cima.
 Os apps que vêm junto são do [F-Droid](https://f-droid.org).
+
+### Licença
+
+[MIT](LICENSE). A fonte Inter ([licença dela](art/fonts/LICENSE-Inter.txt))
+e os arquivos de upstream guardados em `tests/fixtures` continuam com as
+licenças deles.
